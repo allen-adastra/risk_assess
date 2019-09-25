@@ -1,3 +1,5 @@
+from itertools import accumulate
+
 """cbeta is the beta distribuiton multiplied by a constant. When c = 1, this
 is just a normal beta random variable."""
 class cBetaRandomVariable(object):
@@ -6,13 +8,13 @@ class cBetaRandomVariable(object):
         self.beta = beta
         self.c = c
 
-    def compute_moments(order):
+    def compute_moments(self, order):
         #Compute all beta moments up to the given order
         #the returned list indices should match the moment orders
         #e.g. the return[i] should be the ith beta moment
-        fs = map(lambda r: (alpha + r)/(alpha + beta + r), range(order))
+        fs = map(lambda r: (self.alpha + r)/(self.alpha + self.beta + r), range(order))
         beta = [1] + list(accumulate(fs, lambda prev,n: prev*n))
-        cbeta = [beta[i]*c**i for i in range(len(beta))]
+        cbeta = [beta[i]*self.c**i for i in range(len(beta))]
         return cbeta
 
 class RandomVector(object):
@@ -23,6 +25,6 @@ class RandomVector(object):
     def compute_vector_moments(self, n_moments):
         # n_moments is a list of numbers of the maximum moment order to be computed for each random variable
         all_moments = [] #list of list
-        for i in range(len(self.distributions)):
+        for i in range(len(self.random_variables)):
             all_moments.append(self.random_variables[i].compute_moments(n_moments[i]))
         return all_moments

@@ -1,3 +1,6 @@
+import sympy as sp
+from itertools import accumulate
+import numpy as np
 """
 Discrete time kinematic car model that stores symbolic expressions for the
 cars state at time steps up to n_steps.

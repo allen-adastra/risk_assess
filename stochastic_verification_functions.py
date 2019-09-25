@@ -40,9 +40,6 @@ class StochasticVerificationFunction(object):
         the multinomial expansion.
         """
         final_state = self.dynamics.get_final_state_vec()
-
-        # The zeroth moment is always just one.
-        self.p_moments[0] = 1
         # Symbolic first moment.
         p_first_moment = self.p(final_state[0], final_state[1])
         # Variables that are input at runtime.
@@ -122,9 +119,8 @@ class StochasticVerificationFunction(object):
             return variance/(variance + first_moment**2)
 
 
-    def set_problem_data(self, uaccel_seq, random_vector, theta_seq, x0, y0, v0):
+    def set_problem_data(self, random_vector, theta_seq, x0, y0, v0):
         self.random_vector = random_vector
-        self.random_vector.set_cvals(uaccel_seq)
         self.thetas = theta_seq
         self.x0 = x0
         self.y0 = y0
