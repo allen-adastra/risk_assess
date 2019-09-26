@@ -1,4 +1,5 @@
 from itertools import accumulate
+import numpy as np
 
 """cbeta is the beta distribuiton multiplied by a constant. When c = 1, this
 is just a normal beta random variable."""
@@ -17,6 +18,9 @@ class cBetaRandomVariable(object):
         cbeta = [beta[i]*self.c**i for i in range(len(beta))]
         return cbeta
 
+    def sample(self):
+        return self.c * np.random.beta(self.alpha, self.beta)
+
 class RandomVector(object):
     def __init__(self, random_variables):
         # random_variables: list of random variables
@@ -28,3 +32,6 @@ class RandomVector(object):
         for i in range(len(self.random_variables)):
             all_moments.append(self.random_variables[i].compute_moments(n_moments[i]))
         return all_moments
+
+    def sample(self):
+        return [var.sample() for var in self.random_variables]

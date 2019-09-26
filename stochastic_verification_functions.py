@@ -8,13 +8,14 @@ from inspect import signature
 import itertools
 from itertools import permutations
 import operator
+import math
 
 class StochasticVerificationFunction(object):
-    def __init__(self, p, dynamics, n_steps, dt):
+    def __init__(self, p, dynamics):
         #p: an anonymous function in state
         #dynamics: something something dynamics class, for now just CarKinematicsNoisyAccel
         self.p = p
-        self.dynamics = dynamics(n_steps, dt)
+        self.dynamics = dynamics
         self.coef_funcs = {}
         self.monoms = {}
 
@@ -22,7 +23,7 @@ class StochasticVerificationFunction(object):
         """
         Compile functions to evaluate E[p(x,y)] and E[p(x,y)^2].
         """
-        final_state = self.dynamics.get_final_state_vec()
+        final_state = self.dynamics.get_final_state()
         x_final = final_state[0]
         y_final = final_state[1]
         p_first_moment = self.p(x_final, y_final)
@@ -39,7 +40,7 @@ class StochasticVerificationFunction(object):
         Compile functions to evaluate E[p(x,y)] and E[p(x,y)^2] by leveraging
         the multinomial expansion.
         """
-        final_state = self.dynamics.get_final_state_vec()
+        final_state = self.dynamics.get_final_state()
         # Symbolic first moment.
         p_first_moment = self.p(final_state[0], final_state[1])
         # Variables that are input at runtime.
@@ -50,7 +51,6 @@ class StochasticVerificationFunction(object):
         self.monoms[1] = p_first_moment.monoms()
         n_monoms = len(self.monoms[1])
 
-        # TODO(allen): what the fuck?
         comb_twos = list(itertools.combinations(range(n_monoms), 1))
         comb_ones = list(itertools.combinations(range(n_monoms), 2))
         monom_twos = len(comb_twos)*[None]
@@ -102,8 +102,8 @@ class StochasticVerificationFunction(object):
             p_second_coefs[count] = coefs
         p_first_moment = np.dot(p_first_coefs, p_first_monomoments)
         p_second_moment = np.dot(p_second_coefs, p_second_monomoments)
-        print("first moment is: " + str(p_first_moment))
-        print("second moment is: " + str(p_second_moment))
+        #print("first moment is: " + str(p_first_moment))
+        #print("second moment is: " + str(p_second_moment))
         prob_bound = self.chebyshev_bound(p_first_moment, p_second_moment)
         print("prob bound is: " + str(prob_bound))
 
@@ -126,20 +126,38 @@ class StochasticVerificationFunction(object):
         self.y0 = y0
         self.v0 = v0
 
+    def monte_carlo_result(self, n_samples, dt):
+        fails = 0
+        for i in range(n_samples):
+            sampled_accels = self.random_vector.sample()
+            x = self.x0
+            y = self.y0
+            v = self.v0
+            for j in range(len(sampled_accels)):
+                x += dt * v * math.cos(self.thetas[j])
+                y += dt * v * math.sin(self.thetas[j])
+                v += dt * sampled_accels[j]
+            final_p = self.p(x, y)
+            if final_p <= 0:
+                fails+=1
+        return fails/n_samples
+
+
     def compute_rv_moments(self):
         n_vars = len(self.monoms[1][0])
-        x_max_moments = []
-        y_max_moments = []
+        monom_one_max_moments = []
+        monom_two_max_moments = []
         for i in range(n_vars):
-            x_max_moments.append(max([x[i] for x in self.monoms[1]]))
-            y_max_moments.append(max([y[i] for y in self.monoms[2]]))
-        max_moments = [max(x_max_moments[i], y_max_moments[i]) for i in range(len(x_max_moments))]
+            monom_one_max_moments.append(max([x[i] for x in self.monoms[1]]))
+            monom_two_max_moments.append(max([y[i] for y in self.monoms[2]]))
+        # For the ith random variable, determine the maximum moment we would need for it.
+        max_moments = [max(monom_one_max_moments[i], monom_two_max_moments[i]) for i in range(len(monom_one_max_moments))]
         moments = self.random_vector.compute_vector_moments(max_moments)
 
-        #for each mono, the ith entry corresponds to the ith rv and the moment we want....
-        mono1_moments = [reduce(lambda a,b: a*b, map(lambda i:moments[i][mono[i]] , range(len(mono)))) for mono in self.monoms[1]]
-        mono2_moments = [reduce(lambda a,b: a*b, map(lambda i:moments[i][mono[i]] , range(len(mono)))) for mono in self.monoms[2]]
-
+        # For each tuple in self.monoms[1] or self.monoms[2], the ith entry corresponds to the degree of that particular variable
+        # in the monomial.
+        mono1_moments = [np.prod([moments[i][mono[i]] for i in range(len(mono))]) for mono in self.monoms[1]]
+        mono2_moments = [np.prod([moments[i][mono[i]] for i in range(len(mono))]) for mono in self.monoms[2]]
         return mono1_moments, mono2_moments
 
     def compute_prob_bound(self):
