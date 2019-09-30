@@ -3,6 +3,11 @@ from itertools import accumulate
 import numpy as np
 import math
 
+class InputVariables(object):
+  def __init__(self, **attrs):
+    for name, value in attrs.items():
+      setattr(self, name, value)
+        
 class UncontrolledKinematicCar(object):
     def __init__(self, n_steps, dt):
         x0 = sp.symbols('x0', real = True, constant = True)
@@ -18,12 +23,27 @@ class UncontrolledKinematicCar(object):
             vs[i] = vs[i-1] + dt * wvs[i-1]
             xs[i] = xs[i-1] + dt * vs[i-1] * cos_thetas[i-1]
             ys[i] = ys[i-1] + dt * vs[i-1] * sin_thetas[i-1]
-        self.xs = [sp.poly(x, wvs + cos_thetas) for x in xs]
-        self.ys = [sp.poly(y, wvs + sin_thetas) for y in ys]
+        self.xs = [sp.poly(x, wvs + cos_thetas + sin_thetas) for x in xs]
+        self.ys = [sp.poly(y, wvs + cos_thetas + sin_thetas) for y in ys]
         self.x0 = x0
         self.y0 = y0
         self.v0 = v0
         self.dt = dt
+
+    def get_final_state(self):
+        return [self.xs[-1], self.ys[-1]]
+
+    def get_input_vars(self):
+        return [self.x0, self.y0, self.v0]
+
+    def listify_input_vars(self, input_vars):
+        return [input_vars.x0, input_vars.y0, input_vars.v0]
+
+    def construct_thetas(self, theta0, wthetas):
+        """
+        Given a theta0 and a list of instances of RandomVariable that are wtheta's [wtheta_0, wtheta_1, wtheta_2, ....]
+        Return a 
+        """
 
 """
 Discrete time kinematic car model that stores symbolic expressions for the
@@ -60,6 +80,12 @@ class KinematicCarAccelNoise(object):
 
     def get_final_state(self):
         return [self.xs[-1], self.ys[-1]]
+
+    def get_input_vars(self):
+        return list(self.thetas) + [self.x0, self.y0, self.v0]
+
+    def listify_input_vars(self, input_vars):
+        return list(input_vars.thetas) + [input_vars.x0, input_vars.y0, input_vars.v0]
 
     def simulate_step(self, x1, y1, theta1, v1, uaw, dt):
         x2 = x1 + dt * v1 * math.cos(theta1)

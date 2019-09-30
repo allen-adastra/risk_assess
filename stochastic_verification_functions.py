@@ -11,46 +11,32 @@ import operator
 import math
 
 class StochasticVerificationFunction(object):
-    def __init__(self, p, dynamics):
+    def __init__(self, p, stochastic_model):
         #p: an anonymous function in state
-        #dynamics: something something dynamics class, for now just CarKinematicsNoisyAccel
+        #stochastic_model:
         self.p = p
-        self.dynamics = dynamics
+        self.stochastic_model = stochastic_model
         self.coef_funcs = {}
         self.monoms = {}
-
-    def compile_moment_functions(self):
-        """
-        Compile functions to evaluate E[p(x,y)] and E[p(x,y)^2].
-        """
-        final_state = self.dynamics.get_final_state()
-        x_final = final_state[0]
-        y_final = final_state[1]
-        p_first_moment = self.p(x_final, y_final)
-        p_second_moment = self.p(x_final, y_final)**2
-        input_vars = list(self.dynamics.thetas) + [self.dynamics.x0, self.dynamics.y0, self.dynamics.v0]
-
-        self.coef_funcs[1] = [ufuncify(input_vars,coef) for coef in p_first_moment.coeffs()]
-        self.coef_funcs[2] = [ufuncify(input_vars,coef) for coef in p_second_moment.coeffs()]
-        self.monoms[1] = p_first_moment.monoms()
-        self.monoms[2] = p_second_moment.monoms()
 
     def compile_moment_functions_multinomial(self):
         """
         Compile functions to evaluate E[p(x,y)] and E[p(x,y)^2] by leveraging
         the multinomial expansion.
         """
-        final_state = self.dynamics.get_final_state()
+        final_state = self.stochastic_model.get_final_state()
         # Symbolic first moment.
         p_first_moment = self.p(final_state[0], final_state[1])
+
         # Variables that are input at runtime.
-        input_vars = list(self.dynamics.thetas) + [self.dynamics.x0, self.dynamics.y0, self.dynamics.v0]
+        input_vars = self.stochastic_model.get_input_vars()
 
         # Compile the coefficients and monomials.
         self.coef_funcs[1] = [ufuncify(input_vars, coef) for coef in p_first_moment.coeffs()]
         self.monoms[1] = p_first_moment.monoms()
-        n_monoms = len(self.monoms[1])
 
+        n_monoms = len(self.monoms[1])
+        # TODO: clear up this confusion
         comb_twos = list(itertools.combinations(range(n_monoms), 1))
         comb_ones = list(itertools.combinations(range(n_monoms), 2))
         monom_twos = len(comb_twos)*[None]
@@ -85,8 +71,8 @@ class StochasticVerificationFunction(object):
         self.monoms[2] = p2_moment_monoms
         self.p2_var_monoms = p2_var_monoms
 
-    def compute_prob_bound_multimonial(self):
-        coef_data = list(self.thetas) + [self.x0, self.y0, self.v0]
+    def compute_prob_bound_multimonial(self, input_variables):
+        coef_data = self.stochastic_model.listify_input_vars(input_variables) # TODO: how to best do this?
         p_first_coefs = [coef_func(*coef_data) for coef_func in self.coef_funcs[1]]
         p_first_monomoments, p_second_monomoments = self.compute_rv_moments()
         p_second_coefs = len(self.p2_var_monoms)*[0]
@@ -104,10 +90,7 @@ class StochasticVerificationFunction(object):
         p_second_moment = np.dot(p_second_coefs, p_second_monomoments)
         prob_bound = self.chebyshev_bound(p_first_moment, p_second_moment)
         print("prob bound is: " + str(prob_bound))
-
-    def compute_p_second_coefs(self, p_first_coefs):
-        pass
-
+        
     def chebyshev_bound(self, first_moment, second_moment):
         #bound the probability that p<=0
         if first_moment<=0:
@@ -115,30 +98,25 @@ class StochasticVerificationFunction(object):
         else:
             variance = second_moment - first_moment**2
             return variance/(variance + first_moment**2)
-
-    def set_problem_data(self, random_vector, theta_seq, x0, y0, v0):
+    
+    def set_random_vector(self, random_vector):
         self.random_vector = random_vector
-        self.thetas = theta_seq
-        self.x0 = x0
-        self.y0 = y0
-        self.v0 = v0
 
-    def monte_carlo_result(self, n_samples, dt):
+    def monte_carlo_result(self, input_vars, n_samples, dt):
         fails = 0
         for i in range(n_samples):
             sampled_accels = self.random_vector.sample()
-            x = self.x0
-            y = self.y0
-            v = self.v0
+            x = input_vars.x0
+            y = input_vars.y0
+            v = input_vars.v0
             for j in range(len(sampled_accels)):
-                x += dt * v * math.cos(self.thetas[j])
-                y += dt * v * math.sin(self.thetas[j])
+                x += dt * v * math.cos(input_vars.thetas[j])
+                y += dt * v * math.sin(input_vars.thetas[j])
                 v += dt * sampled_accels[j]
             final_p = self.p(x, y)
             if final_p <= 0:
                 fails+=1
         return fails/n_samples
-
 
     def compute_rv_moments(self):
         n_vars = len(self.monoms[1][0])
@@ -156,46 +134,3 @@ class StochasticVerificationFunction(object):
         mono1_moments = [np.prod([moments[i][mono[i]] for i in range(len(mono))]) for mono in self.monoms[1]]
         mono2_moments = [np.prod([moments[i][mono[i]] for i in range(len(mono))]) for mono in self.monoms[2]]
         return mono1_moments, mono2_moments
-
-    def compute_prob_bound(self):
-        coef_data = list(self.thetas) + [self.x0, self.y0, self.v0]
-
-        p_first_coefs = [coef_func(*coef_data) for coef_func in self.coef_funcs[1]]
-        p_second_coefs = [coef_func(*coef_data) for coef_func in self.coef_funcs[2]]
-        p_first_monomoments, p_second_monomoments = self.compute_rv_moments()
-
-        p_first_moment = np.dot(p_first_coefs, p_first_monomoments)
-        p_second_moment = np.dot(p_second_coefs, p_second_monomoments)
-        prob_bound = self.chebyshev_bound(p_first_moment, p_second_moment)
-        print("prob bound is: " + str(prob_bound))
-
-
-
-def compute_all_thetas(theta0, utheta):
-    return theta0 + np.cumsum(utheta)
-
-def compute_beta2_mono_moments(alpha, beta, monos):
-    max_order_needed = max(max(monos))
-    #assume iid beta moments
-    beta2_moments = compute_beta2_moments(alpha,beta,max_order_needed)
-    cross_moments = [reduce(lambda prev,ni: prev*beta2_moments[ni],[1] + list(tup)) for tup in monos]
-    return cross_moments
-
-def compute_beta_moments(alpha,beta,order):
-    #Compute beta moments up to the given order
-    #the returned list indices should match the moment orders
-    #e.g. the return[i] should be the ith beta moment
-    fs = map(lambda r: (alpha + r)/(alpha + beta + r), range(order))
-    return [1] + list(accumulate(fs, lambda prev,n: prev*n))
-
-def compute_beta2_moments(alpha, beta, n):
-    beta_moments = compute_beta_moments(alpha, beta, n)
-    return [beta_moments[i]*2**i for i in range(len(beta_moments))]
-
-def chebyshev_bound(first_moment, second_moment):
-    #bound the probability that p<=0
-    if first_moment<=0:
-        return None
-    else:
-        variance = second_moment - first_moment**2
-        return variance/(variance + first_moment**2)
