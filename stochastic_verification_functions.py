@@ -74,7 +74,9 @@ class StochasticVerificationFunction(object):
     def compute_prob_bound_multimonial(self, input_variables):
         coef_data = self.stochastic_model.listify_input_vars(input_variables) # TODO: how to best do this?
         p_first_coefs = [coef_func(*coef_data) for coef_func in self.coef_funcs[1]]
+        start_compute_rv_moments = time.time()
         p_first_monomoments, p_second_monomoments = self.compute_rv_moments()
+        print("Time to compute rv moments: " + str(time.time() - start_compute_rv_moments))
         p_second_coefs = len(self.p2_var_monoms)*[0]
         for count, mono in enumerate(self.p2_var_monoms):
             if 1 in mono:

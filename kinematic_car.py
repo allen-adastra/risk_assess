@@ -2,6 +2,7 @@ import sympy as sp
 from itertools import accumulate
 import numpy as np
 import math
+from random_variables import *
 
 class InputVariables(object):
   def __init__(self, **attrs):
@@ -39,11 +40,14 @@ class UncontrolledKinematicCar(object):
     def listify_input_vars(self, input_vars):
         return [input_vars.x0, input_vars.y0, input_vars.v0]
 
-    def construct_thetas(self, theta0, wthetas):
+    def construct_cos_sin_theta_rvs(self, theta0, wthetas):
         """
         Given a theta0 and a list of instances of RandomVariable that are wtheta's [wtheta_0, wtheta_1, wtheta_2, ....]
-        Return a 
+        Return a sequence of instances of CosSumOfRVs and SinSumOfRVs
         """
+        cos_thetas = [CosSumOfRVs(theta0, wthetas[:i]) for i in range(len(wthetas) + 1)]
+        sin_thetas = [SinSumOfRVs(theta0, wthetas[:i]) for i in range(len(wthetas) + 1)]
+        return cos_thetas, sin_thetas
 
 """
 Discrete time kinematic car model that stores symbolic expressions for the

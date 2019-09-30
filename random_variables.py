@@ -15,7 +15,6 @@ class RandomVariable(object):
     def sample(self):
         raise NotImplementedError("Method sample() is not implemented")
 
-
 """cbeta is the beta distribution multiplied by a constant. When c = 1, this
 is just a normal beta random variable."""
 class cBetaRandomVariable(RandomVariable):
@@ -54,10 +53,10 @@ class CosSumOfRVs(RandomVariable):
         self.c = c
         self.random_variables = random_variables
 
-    def compute_moments(self, order):
+    def compute_moment(self, order):
         n = int(math.floor(order/2))
         # The ith element of real_component is the real component of CharacteristicFunction(i)
-        char_fun_values = [self.compute_characteristic_function(i) for i in range(order)] 
+        char_fun_values = [self.compute_characteristic_function(i) for i in range(order + 1)]
         real_component = [np.real(val) for val in char_fun_values]
         # Different expressions depending on if the order is odd or even
         if order % 2 == 0:
@@ -69,6 +68,9 @@ class CosSumOfRVs(RandomVariable):
         else:
             raise Exception("Input order mod 2 is neither 0 nor 1")
 
+    def compute_moments(self, order):
+            return [self.compute_moment(i) for i in range(order + 1)]
+
     def compute_characteristic_function(self, t):
         """
         If there are n random variables in self.random_variables w_i for i = 1,...,n
@@ -77,15 +79,19 @@ class CosSumOfRVs(RandomVariable):
         """
         return cmath.exp(complex(0, 1) * t * self.c) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
 
+"""
+Let x1, x2, ..., xn be n independent random variables and c be some constant.
+This object is the random variable sin(c + x1 + x2 + ... + xn)
+"""
 class SinSumOfRVs(RandomVariable):
     def __init__(self, c, random_variables):
         self.c = c
         self.random_variables = random_variables
 
-    def compute_moments(self, order):
+    def compute_moment(self, order):
         n = int(math.floor(order/2))
         # The ith element of real_component is the real component of CharacteristicFunction(i)
-        char_fun_values = [self.compute_characteristic_function(i) for i in range(order)] 
+        char_fun_values = [self.compute_characteristic_function(i) for i in range(order + 1)]
         real_component = [np.real(val) for val in char_fun_values]
         imaginary_component = [np.imag(val) for val in char_fun_values]
         # Different expressions depending on if the order is odd or even
@@ -97,6 +103,9 @@ class SinSumOfRVs(RandomVariable):
             return ((-1**n)/(4**n)) * summation
         else:
             raise Exception("Input order mod 2 is neither 0 nor 1")
+
+    def compute_moments(self, order):
+        return [self.compute_moment(i) for i in range(order + 1)]
 
     def compute_characteristic_function(self, t):
         """
@@ -114,7 +123,7 @@ class RandomVector(object):
     def compute_vector_moments(self, n_moments):
         # n_moments is a list of numbers of the maximum moment order to be computed for each random variable
         all_moments = [] #list of list
-        for i in range(len(self.random_variables)):
+        for i in range(len(n_moments)):
             all_moments.append(self.random_variables[i].compute_moments(n_moments[i]))
         return all_moments
 
