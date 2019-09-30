@@ -102,8 +102,6 @@ class StochasticVerificationFunction(object):
             p_second_coefs[count] = coefs
         p_first_moment = np.dot(p_first_coefs, p_first_monomoments)
         p_second_moment = np.dot(p_second_coefs, p_second_monomoments)
-        #print("first moment is: " + str(p_first_moment))
-        #print("second moment is: " + str(p_second_moment))
         prob_bound = self.chebyshev_bound(p_first_moment, p_second_moment)
         print("prob bound is: " + str(prob_bound))
 

@@ -1,7 +1,8 @@
 from itertools import accumulate
 import numpy as np
+from scipy.special import hyp1f1
 
-"""cbeta is the beta distribuiton multiplied by a constant. When c = 1, this
+"""cbeta is the beta distribution multiplied by a constant. When c = 1, this
 is just a normal beta random variable."""
 class cBetaRandomVariable(object):
     def __init__(self, alpha, beta, c):
@@ -21,6 +22,18 @@ class cBetaRandomVariable(object):
     def sample(self):
         return self.c * np.random.beta(self.alpha, self.beta)
 
+    def compute_characteristic_function(self, t):
+        """
+        The characteristic function of the beta distribution is Kummer's confluent hypergeometric function which 
+        is implemented by scipy.special.hyp1f1. See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.hyp2f1.html
+        """
+        return hyp1f1(self.alpha, self.beta, self.c * t)
+
+    def compute_cosine_moment(self, n):
+        """
+
+        """
+
 class RandomVector(object):
     def __init__(self, random_variables):
         # random_variables: list of random variables
@@ -35,3 +48,10 @@ class RandomVector(object):
 
     def sample(self):
         return [var.sample() for var in self.random_variables]
+
+    def sum_characteristic_function(self, c, t):
+        """
+        If there are n random variables in self.random_variables w_i for i = 1,...,n
+        And we have some constant c, then this function computes the characteristic function of
+        c + w_1 + ... + w_n
+        """
