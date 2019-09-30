@@ -1,5 +1,7 @@
 from itertools import accumulate
 import numpy as np
+import math
+import cmath
 from scipy.special import hyp1f1
 
 """cbeta is the beta distribution multiplied by a constant. When c = 1, this
@@ -26,13 +28,10 @@ class cBetaRandomVariable(object):
         """
         The characteristic function of the beta distribution is Kummer's confluent hypergeometric function which 
         is implemented by scipy.special.hyp1f1. See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.hyp2f1.html
+        If Phi_X(t) is the characteristic function of X, then for any constant c, the characteristic function of cX is
+        Phi_cX(t) = Phi_X(ct)
         """
         return hyp1f1(self.alpha, self.beta, self.c * t)
-
-    def compute_cosine_moment(self, n):
-        """
-
-        """
 
 class RandomVector(object):
     def __init__(self, random_variables):
@@ -55,3 +54,4 @@ class RandomVector(object):
         And we have some constant c, then this function computes the characteristic function of
         c + w_1 + ... + w_n
         """
+        return cmath.exp(complex(0, 1) * t * c) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])

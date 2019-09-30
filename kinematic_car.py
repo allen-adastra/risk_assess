@@ -3,6 +3,28 @@ from itertools import accumulate
 import numpy as np
 import math
 
+class UncontrolledKinematicCar(object):
+    def __init__(self, n_steps, dt):
+        x0 = sp.symbols('x0', real = True, constant = True)
+        y0 = sp.symbols('y0', real = True, constant = True)
+        v0 = sp.symbols('v0', real = True, constant = True)
+        wvs = sp.symbols('wv0:' + str(n_steps), real = True)
+        cos_thetas = sp.symbols('cos_theta0:' + str(n_steps), real = True)
+        sin_thetas = sp.symbols('sin_theta0:' + str(n_steps), real = True)
+        vs = [v0] + n_steps * [0]
+        xs = [x0] + n_steps * [0]
+        ys = [y0] + n_steps * [0]
+        for i in range(1, n_steps + 1):
+            vs[i] = vs[i-1] + dt * wvs[i-1]
+            xs[i] = xs[i-1] + dt * vs[i-1] * cos_thetas[i-1]
+            ys[i] = ys[i-1] + dt * vs[i-1] * sin_thetas[i-1]
+        self.xs = [sp.poly(x, wvs + cos_thetas) for x in xs]
+        self.ys = [sp.poly(y, wvs + sin_thetas) for y in ys]
+        self.x0 = x0
+        self.y0 = y0
+        self.v0 = v0
+        self.dt = dt
+
 """
 Discrete time kinematic car model that stores symbolic expressions for the
 cars state at time steps up to n_steps.
@@ -19,7 +41,7 @@ class KinematicCarAccelNoise(object):
         vs = [v0] + n_steps * [0]
         xs = [x0] + n_steps * [0]
         ys = [y0] + n_steps * [0]
-        thetas = sp.symbols('theta0:' + str(n_steps), real = True)
+        thetas = sp.symbols('theta0:' + str(n_steps), real = True, constant = True)
         cos_thetas = [sp.cos(t) for t in thetas]
         sin_thetas = [sp.sin(t) for t in thetas]
         for i in range(1, n_steps + 1):

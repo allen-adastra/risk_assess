@@ -116,7 +116,6 @@ class StochasticVerificationFunction(object):
             variance = second_moment - first_moment**2
             return variance/(variance + first_moment**2)
 
-
     def set_problem_data(self, random_vector, theta_seq, x0, y0, v0):
         self.random_vector = random_vector
         self.thetas = theta_seq
