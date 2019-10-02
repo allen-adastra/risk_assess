@@ -57,7 +57,7 @@ class cBetaRandomVariable(RandomVariable):
     def compute_characteristic_function(self, t):
         """
         The characteristic function of the beta distribution is Kummer's confluent hypergeometric function which 
-        is implemented by scipy.special.hyp1f1. See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.hyp2f1.html
+        is implemented by scipy.special.hyp1f1. See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.hyp1f1.html
         If Phi_X(t) is the characteristic function of X, then for any constant c, the characteristic function of cX is
         Phi_cX(t) = Phi_X(ct)
         """
@@ -73,7 +73,7 @@ class CosSumOfRVs(RandomVariable):
         self.random_variables = random_variables
 
     def compute_moment(self, order):
-        n = int(math.floor(order/2))
+        n = math.floor(order/2)
         # The ith element of real_component is the real component of CharacteristicFunction(i)
         char_fun_values = [self.compute_characteristic_function(i) for i in range(order + 1)]
         real_component = [np.real(val) for val in char_fun_values]
@@ -108,18 +108,18 @@ class SinSumOfRVs(RandomVariable):
         self.random_variables = random_variables
 
     def compute_moment(self, order):
-        n = int(math.floor(order/2))
+        n = math.floor(order/2)
         # The ith element of real_component is the real component of CharacteristicFunction(i)
         char_fun_values = [self.compute_characteristic_function(i) for i in range(order + 1)]
         real_component = [np.real(val) for val in char_fun_values]
         imaginary_component = [np.imag(val) for val in char_fun_values]
         # Different expressions depending on if the order is odd or even
         if order % 2 == 0:
-            summation = sum([(-1**k) * comb(order, k) * real_component[2 * (n - k)] for k in range(n)])
-            return (1.0/(2.0**(2.0 * n))) * comb(order, n) + ((-1**n)/ (2**(2 * n - 1))) * summation
+            summation = sum([((-1)**k) * comb(order, k) * real_component[2 * (n - k)] for k in range(n)])
+            return (1.0/(2.0**(2.0 * n))) * comb(order, n) + (((-1)**n)/ (2**(2 * n - 1))) * summation
         elif order % 2 == 1:
-            summation = sum([(-1**k) * comb(order, k) * imaginary_component[2 * n + 1 - 2 * k] for k in range(n+1)])
-            return ((-1**n)/(4**n)) * summation
+            summation = sum([((-1)**k) * comb(order, k) * imaginary_component[2 * n + 1 - 2 * k] for k in range(n+1)])
+            return (((-1)**n)/(4**n)) * summation
         else:
             raise Exception("Input order mod 2 is neither 0 nor 1")
 

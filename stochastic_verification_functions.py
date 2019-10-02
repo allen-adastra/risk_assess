@@ -10,6 +10,9 @@ from itertools import permutations
 import operator
 import math
 
+def add_tuples(tuple1, tuple2):
+    return tuple(map(operator.add,tuple1,tuple2))
+
 class StochasticVerificationFunction(object):
     def __init__(self, p, stochastic_model):
         #p: an anonymous function in state
@@ -52,7 +55,6 @@ class StochasticVerificationFunction(object):
         degree_one_variables = list(itertools.combinations(range(n_monoms), 2))
         monom_twos = len(degree_two_variables)*[None]
         monom_ones = len(degree_one_variables)*[None]
-
         for i in range(len(degree_two_variables)):
             new_array = n_monoms*[0]
             new_array[degree_two_variables[i][0]] = 2
@@ -70,15 +72,16 @@ class StochasticVerificationFunction(object):
         # Determine the multi indices for the monomials in the expression for the second moment of p(x)
         p2_moment_monoms = []
         for mono in p2_var_monoms:
+            assert(sum(mono) == 2)
             if 1 in mono:
                 # Find the indicies of the first moment terms that have degree one.
                 idx = [i for i,x in enumerate(mono) if x == 1]
                 assert(len(idx) == 2)
-                new_mono = tuple(map(operator.add,self.monoms[1][idx[0]],self.monoms[1][idx[1]]))
+                new_mono = add_tuples(self.monoms[1][idx[0]], self.monoms[1][idx[1]])
             elif 2 in mono:
                 # In this case, mono should consist of one two with the rest of the entries being zero.
                 # So something like: (0, 0, 0, 2, 0, 0,...)
-                new_mono = tuple(map(operator.add,self.monoms[1][mono.index(2)],self.monoms[1][mono.index(2)]))
+                new_mono = add_tuples(self.monoms[1][mono.index(2)], self.monoms[1][mono.index(2)])
             else:
                 raise Exception("There should be a 1 or 2 in here...")
             p2_moment_monoms.append(new_mono)
@@ -95,6 +98,7 @@ class StochasticVerificationFunction(object):
         p_first_monomoments, p_second_monomoments = self.compute_rv_moments()
         p_second_coefs = len(self.p2_var_monoms)*[0]
         for count, mono in enumerate(self.p2_var_monoms):
+            assert(sum(mono) == 2)
             if 1 in mono:
                 idx = [i for i,x in enumerate(mono) if x==1]
                 assert(len(idx) == 2)
@@ -103,7 +107,7 @@ class StochasticVerificationFunction(object):
             elif 2 in mono:
                 i = mono.index(2)
                 # In this case, the multinomial coefficient is 2!/(2!) = 1
-                # And we just square
+                # And we just square the coefficient.
                 coefs = p_first_coefs[i]**2
             else:
                 raise Exception("There should be a 1 or 2 in here...")
@@ -143,16 +147,15 @@ class StochasticVerificationFunction(object):
         return fails/n_samples
 
     def compute_rv_moments(self):
+        assert(len(self.monoms[1][0]) == len(self.monoms[2][0]))
         n_vars = len(self.monoms[1][0])
-        monom_one_max_moments = []
-        monom_two_max_moments = []
+        max_moments = n_vars * [0]
+        # The maximum moment needed for a random variable will always be determined by that needed to compute
+        # the second moment of p
         for i in range(n_vars):
-            monom_one_max_moments.append(max([x[i] for x in self.monoms[1]]))
-            monom_two_max_moments.append(max([y[i] for y in self.monoms[2]]))
-        # For the ith random variable, determine the maximum moment we would need for it.
-        max_moments = [max(monom_one_max_moments[i], monom_two_max_moments[i]) for i in range(len(monom_one_max_moments))]
+            moments_needed_for_second_order_monomials = [y[i] for y in self.monoms[2]]
+            max_moments[i] = max(moments_needed_for_second_order_monomials)
         moments = self.random_vector.compute_vector_moments(max_moments)
-
         # For each tuple in self.monoms[1] or self.monoms[2], the ith entry corresponds to the degree of that particular variable
         # in the monomial.
         mono1_moments = [np.prod([moments[i][mono[i]] for i in range(len(mono))]) for mono in self.monoms[1]]

@@ -17,9 +17,9 @@ class UncontrolledKinematicCar(object):
         wvs = sp.symbols('wv0:' + str(n_steps), real = True)
         cos_thetas = sp.symbols('cos_theta0:' + str(n_steps), real = True)
         sin_thetas = sp.symbols('sin_theta0:' + str(n_steps), real = True)
-        vs = [v0] + n_steps * [0]
         xs = [x0] + n_steps * [0]
         ys = [y0] + n_steps * [0]
+        vs = [v0] + n_steps * [0]
         for i in range(1, n_steps + 1):
             vs[i] = vs[i-1] + dt * wvs[i-1]
             xs[i] = xs[i-1] + dt * vs[i-1] * cos_thetas[i-1]
@@ -49,8 +49,8 @@ class UncontrolledKinematicCar(object):
         Given a theta0 and a list of instances of RandomVariable that are wtheta's [wtheta_0, wtheta_1, wtheta_2, ....]
         Return a sequence of instances of CosSumOfRVs and SinSumOfRVs
         """
-        cos_thetas = [Constant(math.cos(theta0))] + [CosSumOfRVs(theta0, wthetas[:i]) for i in range(len(wthetas))]
-        sin_thetas = [Constant(math.sin(theta0))] + [SinSumOfRVs(theta0, wthetas[:i]) for i in range(len(wthetas))]
+        cos_thetas = [Constant(math.cos(theta0))] + [CosSumOfRVs(theta0, wthetas[:i]) for i in range(1, len(wthetas))]
+        sin_thetas = [Constant(math.sin(theta0))] + [SinSumOfRVs(theta0, wthetas[:i]) for i in range(1, len(wthetas))]
         return cos_thetas, sin_thetas
 
 """
