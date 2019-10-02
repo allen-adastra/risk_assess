@@ -38,6 +38,10 @@ class UncontrolledKinematicCar(object):
         return [self.x0, self.y0, self.v0]
 
     def listify_input_vars(self, input_vars):
+        """
+        Take an instance of InputVariables and arrange the data in a list consistent with the order
+        that input variables are specified in the method "get_input_vars"
+        """
         return [input_vars.x0, input_vars.y0, input_vars.v0]
 
     def construct_cos_sin_theta_rvs(self, theta0, wthetas):
@@ -45,8 +49,8 @@ class UncontrolledKinematicCar(object):
         Given a theta0 and a list of instances of RandomVariable that are wtheta's [wtheta_0, wtheta_1, wtheta_2, ....]
         Return a sequence of instances of CosSumOfRVs and SinSumOfRVs
         """
-        cos_thetas = [CosSumOfRVs(theta0, wthetas[:i]) for i in range(len(wthetas) + 1)]
-        sin_thetas = [SinSumOfRVs(theta0, wthetas[:i]) for i in range(len(wthetas) + 1)]
+        cos_thetas = [Constant(math.cos(theta0))] + [CosSumOfRVs(theta0, wthetas[:i]) for i in range(len(wthetas))]
+        sin_thetas = [Constant(math.sin(theta0))] + [SinSumOfRVs(theta0, wthetas[:i]) for i in range(len(wthetas))]
         return cos_thetas, sin_thetas
 
 """
@@ -60,8 +64,6 @@ class KinematicCarAccelNoise(object):
         v0 = sp.symbols('v0', real = True, constant = True)
         # uaw is the accel command multiplied by a random variable for accel noise.
         accel_mult_random = sp.symbols('uaw0:' + str(n_steps), real = True)
-        # vs is a list of speeds at times 0, 1,..., n_steps
-        dvs = list(accumulate([0] + list(accel_mult_random), lambda cum_sum, next_accel: cum_sum + next_accel))
         vs = [v0] + n_steps * [0]
         xs = [x0] + n_steps * [0]
         ys = [y0] + n_steps * [0]

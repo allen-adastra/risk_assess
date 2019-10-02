@@ -15,6 +15,25 @@ class RandomVariable(object):
     def sample(self):
         raise NotImplementedError("Method sample() is not implemented")
 
+class Constant(RandomVariable):
+    def __init__(self, value):
+        self.value = value        
+
+    def compute_moment(self, order):
+        if order >= 0:
+            return self.value**order
+        else:
+            raise Exception("Invalid order input")
+
+    def compute_moments(self, order):
+            return [self.compute_moment(i) for i in range(order + 1)]
+    
+    def sample(self):
+        return self.value
+
+    def compute_characteristic_function(self, t):
+        return 1
+
 """cbeta is the beta distribution multiplied by a constant. When c = 1, this
 is just a normal beta random variable."""
 class cBetaRandomVariable(RandomVariable):
@@ -60,7 +79,7 @@ class CosSumOfRVs(RandomVariable):
         real_component = [np.real(val) for val in char_fun_values]
         # Different expressions depending on if the order is odd or even
         if order % 2 == 0:
-            summation = sum([comb(order, k) * char_fun_values[2 * (n - k)] for k in range(n)])
+            summation = sum([comb(order, k) * real_component[2 * (n - k)] for k in range(n)])
             return (1.0/(2.0**(2.0 * n))) * comb(order, n) + (1.0/(2.0**(2.0 * n - 1))) * summation
         elif order % 2 == 1:
             summation = sum([comb(2 * n + 1, k) * real_component[2 * n + 1 - 2 * k] for k in range(n + 1)])
@@ -77,7 +96,7 @@ class CosSumOfRVs(RandomVariable):
         And we have some constant c, then this function computes the characteristic function of
         c + w_1 + ... + w_n
         """
-        return cmath.exp(complex(0, 1) * t * self.c) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
+        return cmath.exp(complex(0, t * self.c)) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
 
 """
 Let x1, x2, ..., xn be n independent random variables and c be some constant.
