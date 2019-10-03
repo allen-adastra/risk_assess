@@ -9,11 +9,36 @@ class RandomVariable(object):
     def __init__(self):
         pass
 
-    def compute_moments(self):
+    def compute_moment(self, order):
         raise NotImplementedError("Method compute_moments() is not implemented.")
 
+    def compute_moments(self, order):
+        return [self.compute_moment(i) for i in range(order + 1)]
+
     def sample(self):
-        raise NotImplementedError("Method sample() is not implemented")
+        raise NotImplementedError("Method sample() is not implemented.")
+
+    def compute_characteristic_function(self, t):
+        raise NotImplementedError("Method compute_characteristic_function() is not implemented.")
+
+class MixtureModel(RandomVariable):
+    def __init__(self, component_random_variables):
+        """
+        component_random_variables: tuples with (RandomVariable corresponding to a mode, probability of the mode)
+        """
+        self.component_random_variables = component_random_variables
+
+    def compute_moment(self, order):
+        moment = 0
+        for rv, prob in self.component_random_variables:
+            moment += prob * rv.compute_moment(order)
+        return moment
+
+    def compute_characteristic_function(self, t):
+        char_fun = 0
+        for rv, prob in self.component_random_variables:
+            char_fun += prob * rv.compute_characteristic_function(t)
+        return char_fun
 
 class Constant(RandomVariable):
     def __init__(self, value):
@@ -25,14 +50,11 @@ class Constant(RandomVariable):
         else:
             raise Exception("Invalid order input")
 
-    def compute_moments(self, order):
-            return [self.compute_moment(i) for i in range(order + 1)]
-    
     def sample(self):
         return self.value
 
     def compute_characteristic_function(self, t):
-        return 1
+        return 1.0
 
 """cbeta is the beta distribution multiplied by a constant. When c = 1, this
 is just a normal beta random variable."""
@@ -43,9 +65,10 @@ class cBetaRandomVariable(RandomVariable):
         self.c = c
 
     def compute_moments(self, order):
-        #Compute all beta moments up to the given order
-        #the returned list indices should match the moment orders
-        #e.g. the return[i] should be the ith beta moment
+        """
+        Compute all beta moments up to the given order. The returned list indices should match the moment orders
+        e.g. the return[i] should be the ith beta moment
+        """
         fs = map(lambda r: (self.alpha + r)/(self.alpha + self.beta + r), range(order))
         beta = [1] + list(accumulate(fs, lambda prev,n: prev*n))
         cbeta = [beta[i]*self.c**i for i in range(len(beta))]
