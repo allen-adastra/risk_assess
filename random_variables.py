@@ -3,7 +3,7 @@ import numpy as np
 import math
 import cmath
 from scipy.special import hyp1f1, comb
-
+from scipy.stats import norm
 
 class RandomVariable(object):
     def __init__(self):
@@ -20,6 +20,19 @@ class RandomVariable(object):
 
     def compute_characteristic_function(self, t):
         raise NotImplementedError("Method compute_characteristic_function() is not implemented.")
+
+class Normal(RandomVariable):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+        self.variance = std**2
+    
+    def compute_moment(self, order):
+        return norm.moment(order, loc = self.mean, scale = self.std)
+    
+    def compute_characteristic_function(self, t):
+        return cmath.exp(complex(0, -self.mean * t)) * cmath.exp(-0.5 * self.variance * t**2)
+
 
 class MixtureModel(RandomVariable):
     def __init__(self, component_random_variables):

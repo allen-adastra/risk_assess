@@ -30,7 +30,6 @@ class StochasticVerificationFunction(object):
         final_state = self.stochastic_model.get_final_state()
         # Symbolic first moment.
         p_first_moment = self.p(final_state[0], final_state[1])
-
         # Variables that are input at runtime.
         input_vars = self.stochastic_model.get_input_vars()
 

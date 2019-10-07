@@ -10,17 +10,15 @@ Test the uncontrolled car model.
 """
 
 p = lambda x,y: x**2 + 0.1 * y**2 - 1
-n_t = 3
-alpha = 50
-beta = 55
+n_t = 2
 dt = 0.05
 x0 = -1.1
 y0 = 0.0
 v0 = 0
 theta0 = 0.0
 
-wvs = [cBetaRandomVariable(alpha, beta, 2) for i in range(n_t)]
-wthetas = [cBetaRandomVariable(alpha, beta, 0.01) for i in range(n_t)]
+wvs = [Normal(1.0, 1.0) for i in range(n_t)]
+wthetas = [Normal(1.0, 1.0) for i in range(n_t)]
 car_model = UncontrolledKinematicCar(n_t, dt)
 cos_rvs, sin_rvs = car_model.construct_cos_sin_theta_rvs(0.0, wthetas)
 
