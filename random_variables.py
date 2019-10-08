@@ -21,6 +21,24 @@ class RandomVariable(object):
     def compute_characteristic_function(self, t):
         raise NotImplementedError("Method compute_characteristic_function() is not implemented.")
 
+    def compute_variance(self):
+        return self.compute_moment(2) - self.compute_moment(1)**2
+
+class RandomVector(object):
+    def __init__(self, random_variables):
+        # random_variables: list of random variables
+        self.random_variables = random_variables
+
+    def compute_vector_moments(self, n_moments):
+        # n_moments is a list of numbers of the maximum moment order to be computed for each random variable
+        all_moments = [] #list of list
+        for i in range(len(n_moments)):
+            all_moments.append(self.random_variables[i].compute_moments(n_moments[i]))
+        return all_moments
+
+    def sample(self):
+        return [var.sample() for var in self.random_variables]
+
 class Normal(RandomVariable):
     def __init__(self, mean, std):
         self.mean = mean
@@ -170,17 +188,32 @@ class SinSumOfRVs(RandomVariable):
         """
         return cmath.exp(complex(0, 1) * t * self.c) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
 
-class RandomVector(object):
-    def __init__(self, random_variables):
-        # random_variables: list of random variables
+"""
+Let x1, x2, ..., xn be n independent random variables and c be some constant.
+Let theta = c + x1 + x2 + ... + xn
+This object is the random variable cos(theta) * sin(theta)
+"""
+class CrossSumOfRVs(RandomVariable):
+    def __init__(self, c, random_variables):
+        self.c = c
         self.random_variables = random_variables
+        self.cos_theta = CosSumOfRVs(c, random_variables)
+        self.sin_theta = SinSumOfRVs(c, random_variables)
 
-    def compute_vector_moments(self, n_moments):
-        # n_moments is a list of numbers of the maximum moment order to be computed for each random variable
-        all_moments = [] #list of list
-        for i in range(len(n_moments)):
-            all_moments.append(self.random_variables[i].compute_moments(n_moments[i]))
-        return all_moments
+    def compute_moment(self, order):
+        if order == 1:
+            return 0.5 * np.imag(self.compute_characteristic_function(2))
+        else:
+            raise Exception("Input order is not currently supported.")
 
-    def sample(self):
-        return [var.sample() for var in self.random_variables]
+    def compute_covariance(self):
+        return self.compute_moment(1) - self.cos_theta.compute_moment(1) * self.sin_theta.compute_moment(1)
+
+    def compute_characteristic_function(self, t):
+        """
+        If there are n random variables in self.random_variables w_i for i = 1,...,n
+        And we have some constant c, then this function computes the characteristic function of
+        c + w_1 + ... + w_n
+        """
+        return cmath.exp(complex(0, 1) * t * self.c) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
+

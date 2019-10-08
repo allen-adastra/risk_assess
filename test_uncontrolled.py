@@ -9,8 +9,8 @@ from pstats import SortKey
 Test the uncontrolled car model.
 """
 
-p = lambda x,y: x**2 + 0.1 * y**2 - 1
-n_t = 2
+p = lambda x,y: 5 * x + 4 * y + 1
+n_t = 10
 dt = 0.05
 x0 = -1.1
 y0 = 0.0
