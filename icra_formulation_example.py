@@ -10,8 +10,8 @@ class Model(object):
         self.ys = [y0]
         self.vs = [v0]
         self.thetas = [theta0]
-        self.steers = []
-        self.rv_omegas = []
+        self.steers = [0]
+        self.rv_omegas = [Constant(0)] # initialize this to a constant
 
         # Random variable moments
         self.sigma_x_squared = [0]
@@ -37,7 +37,6 @@ class Model(object):
         cos_theta = CosSumOfRVs(sum_steers, self.rv_omegas)
         sin_theta = SinSumOfRVs(sum_steers, self.rv_omegas)
         cos_theta_sin_theta = CrossSumOfRVs(sum_steers, self.rv_omegas) #cos(theta) * sin(theta)
-        cross_moment_cos_sin = cos_theta_sin_theta.compute_moment(1)
 
         # Update position covariance matrix quantities.
         new_sigma_x_squared = self.sigma_x_squared[-1] + rv_x.compute_variance() + 2 * self.sigma_x_cos[-1] * (new_v + rv_v.compute_moment(1)) \
@@ -46,9 +45,34 @@ class Model(object):
         new_sigma_y_squared = self.sigma_y_squared[-1] + rv_y.compute_variance() + 2 * self.sigma_y_sin[-1] * (new_v + rv_v.compute_moment(1))\
             + (new_v**2 + 2 * new_v * rv_v.compute_moment(1)) * sin_theta.compute_variance() + rv_v.compute_moment(2) * sin_theta.compute_moment(2)\
             - (rv_v.compute_moment(1)**2) * sin_theta.compute_moment(1)**2
-        new_sigma_x_y = (new_v**2) * cross_moment_cos_sin.compute_covariance() + 2 * new_v * rv_v.compute_moment(1) * cross_moment_cos_sin.compute_covariance()\
-            + rv_v.compute_moment(2) * cross_moment_cos_sin.compute_moment(1) - cos_theta.compute_moment(1) * sin_theta.compute_moment(1) * rv_v.compute_moment(1)**2
+        new_sigma_x_y = (new_v**2) * cos_theta_sin_theta.compute_covariance() + 2 * new_v * rv_v.compute_moment(1) * cos_theta_sin_theta.compute_covariance()\
+            + rv_v.compute_moment(2) * cos_theta_sin_theta.compute_moment(1) - cos_theta.compute_moment(1) * sin_theta.compute_moment(1) * rv_v.compute_moment(1)**2
+        self.sigma_x_squared.append(new_sigma_x_squared)
+        self.sigma_y_squared.append(new_sigma_y_squared)
+        self.sigma_x_y.append(new_sigma_x_y)
 
-        # TODO: update position-trigonometric covariances
+        # Update position-trigonometric covariances
+        # TODO: double check the update equations between Ashkan's original paper and the ICRA submission...
+        c_omega = CosSumOfRVs(self.steers[-1], [self.rv_omegas[-1]])
+        s_omega = SinSumOfRVs(self.steers[-1], [self.rv_omegas[-1]])
+        expected_c_omega = c_omega.compute_moment(1)
+        expected_s_omega = s_omega.compute_moment(1)
+        
+        square_mat = np.array([[expected_c_omega, -expected_s_omega],
+                                [expected_s_omega, expected_c_omega]])
+        expected_v_plus_disturbance = new_v + rv_v.compute_moment(1)
+        r1k = expected_v_plus_disturbance * (expected_c_omega * cos_theta.compute_variance() - expected_s_omega * cos_theta_sin_theta.compute_covariance())
+        r2k = expected_v_plus_disturbance * (expected_s_omega * sin_theta.compute_variance() + expected_c_omega * cos_theta_sin_theta.compute_covariance())
+        r3k = expected_v_plus_disturbance * (expected_c_omega * cos_theta_sin_theta.compute_covariance() - expected_s_omega * sin_theta.compute_variance())
+        r4k = expected_v_plus_disturbance * (expected_s_omega * sin_theta.compute_variance() + expected_c_omega * cos_theta_sin_theta.compute_covariance())
+        old_x_position_trig_covariances = np.array([[self.sigma_x_cos[-1]], [self.sigma_x_sin[-1]]])
+        old_y_position_trig_covariances = np.array([[self.sigma_y_cos[-1]], [self.sigma_y_sin[-1]]])
+        new_x_position_trig_covariances = np.matmul(square_mat, old_x_position_trig_covariances) + np.array([[r1k],[r2k]])
+        new_y_position_trig_covariances = np.matmul(square_mat, old_y_position_trig_covariances) + np.array([[r3k],[r4k]])
+        self.sigma_x_cos.append(new_x_position_trig_covariances[0][0])
+        self.sigma_x_sin.append(new_x_position_trig_covariances[1][0])
+        self.sigma_y_cos.append(new_y_position_trig_covariances[0][0])
+        self.sigma_y_sin.append(new_y_position_trig_covariances[1][0])
+
         self.steers.append(steer)
         self.rv_omegas.append(rv_omega)
