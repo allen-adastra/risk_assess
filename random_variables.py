@@ -216,4 +216,3 @@ class CrossSumOfRVs(RandomVariable):
         c + w_1 + ... + w_n
         """
         return cmath.exp(complex(0, 1) * t * self.c) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
-
