@@ -119,6 +119,24 @@ class cBetaRandomVariable(RandomVariable):
 
 """
 Let x1, x2, ..., xn be n independent random variables and c be some constant.
+This object is the random variable c + x1 + x2 + ... + xn
+"""
+class SumOfRVs(object):
+    def __init__(self, c, random_variables):
+        self.c = c
+        self.random_variables = random_variables
+
+    def cos_applied(self):
+        return CosSumOfRVs(self.c, self.random_variables)
+
+    def sin_applied(self):
+        return SinSumOfRVs(self.c, self.random_variables)
+
+    def add_rv(self, rv):
+        self.random_variables.append(rv)
+
+"""
+Let x1, x2, ..., xn be n independent random variables and c be some constant.
 This object is the random variable cos(c + x1 + x2 + ... + xn)
 """
 class CosSumOfRVs(RandomVariable):
@@ -151,6 +169,12 @@ class CosSumOfRVs(RandomVariable):
         c + w_1 + ... + w_n
         """
         return cmath.exp(complex(0, t * self.c)) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
+    
+    def add_rv(self, rv):
+        self.random_variables.append(rv)
+    
+    def add_constant(self, c):
+        self.c += c
 
 """
 Let x1, x2, ..., xn be n independent random variables and c be some constant.
@@ -187,6 +211,12 @@ class SinSumOfRVs(RandomVariable):
         c + w_1 + ... + w_n
         """
         return cmath.exp(complex(0, 1) * t * self.c) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
+
+    def add_rv(self, rv):
+        self.random_variables.append(rv)
+    
+    def add_constant(self, c):
+        self.c += c
 
 """
 Let x1, x2, ..., xn be n independent random variables and c be some constant.

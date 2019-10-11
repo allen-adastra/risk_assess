@@ -16,19 +16,8 @@ x0 = -1.1
 y0 = 0.0
 v0 = 0
 theta0 = 0.0
-
 wvs = [Normal(1.0, 1.0) for i in range(n_t)]
 wthetas = [Normal(1.0, 1.0) for i in range(n_t)]
-car_model = UncontrolledKinematicCar(n_t, dt)
-cos_rvs, sin_rvs = car_model.construct_cos_sin_theta_rvs(0.0, wthetas)
-
-ordered_random_variables = wvs + cos_rvs + sin_rvs
-
-start_compile = time.time()
-verification_function = StochasticVerificationFunction(p, car_model)
-verification_function.compile_moment_functions_multinomial()
-print("Time to compile: " + str(time.time() - start_compile))
-
-input_variables = InputVariables(x0 = x0, y0 = y0, v0 = v0)
-verification_function.set_random_vector(RandomVector(ordered_random_variables))
-verification_function.compute_prob_bound_multimonial(input_variables)
+car_model = UncontrolledCarIncremental(x0, y0, v0, theta0)
+for i in range(n_t):
+    car_model.propagate_moments(wthetas[i], wvs[i])
