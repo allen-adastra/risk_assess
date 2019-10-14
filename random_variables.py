@@ -4,6 +4,7 @@ import math
 import cmath
 from scipy.special import hyp1f1, comb
 from scipy.stats import norm
+import matplotlib.pyplot as plt
 
 class RandomVariable(object):
     def __init__(self):
@@ -29,6 +30,13 @@ class RandomVariable(object):
 
     def compute_variance(self):
         return self.compute_moment(2) - self.compute_moment(1)**2
+    
+    def plot_histogram(self, n_samples, bins = None):
+        samps = [self.sample() for i in range(n_samples)]
+        if bins == None:
+            bins = "auto"
+        plt.hist(samps, bins = bins)
+        plt.show()
 
 class RandomVector(object):
     def __init__(self, random_variables):
@@ -55,8 +63,9 @@ class MixtureModel(RandomVariable):
         """
         self.component_random_variables = [rv for rv, prob in component_random_variables]
         self.component_probabilities = [prob for rv, prob in component_random_variables]
-        if sum(self.component_probabilities) != 1.0:
-            raise Exception("Input component probabilities must sum to 1")
+        sum_probs = sum(self.component_probabilities)
+        if abs(sum_probs - 1) != 0:
+            raise Exception("Input component probabilities must sum to 1, it sums to: " + str(sum_probs))
 
     def compute_moment(self, order):
         moment = 0

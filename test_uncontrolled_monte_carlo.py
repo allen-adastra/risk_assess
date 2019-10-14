@@ -69,10 +69,11 @@ v0 = 1.0
 theta0 = 0.5
 wvs = RandomVector([Normal(1.0, 0.05) for i in range(n_t)])
 
-central_component = (Normal(0.0, 0.001), 0.9)
-left_component = (Normal(0.3, 0.03), 0.02)
-right_component = (Normal(-0.3, 0.03), 0.08)
+central_component = (Normal(0.0, 0.001), 0.6)
+left_component = (Normal(0.3, 0.03), 0.25)
+right_component = (Normal(-0.3, 0.03), 0.15)
 mm = MixtureModel([central_component, left_component, right_component])
+mm.plot_histogram(10000, bins = 'doane')
 wthetas = RandomVector([mm for i in range(n_t)])
 
 car_model = UncontrolledCarIncremental(x0, y0, v0, theta0)
