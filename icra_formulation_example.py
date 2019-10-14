@@ -1,7 +1,6 @@
-from random_variables import RandomVector, cBetaRandomVariable
+from random_variables import *
 import numpy as np
 from stochastic_verification_functions import StochasticVerificationFunction
-from kinematic_car import *
 import time
 
 class Model(object):

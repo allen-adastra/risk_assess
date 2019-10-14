@@ -10,6 +10,15 @@ class InputVariables(object):
     for name, value in attrs.items():
       setattr(self, name, value)
 
+
+class UncontrolledKinematicCarPositionMoments(object):
+    def __init__(self, E_x, E_y, E_xy, E2_x, E2_y):
+        self.E_x = E_x
+        self.E_y = E_y
+        self.E_xy = E_xy
+        self.E2_x = E2_x
+        self.E2_y = E2_y
+
 class UncontrolledKinematicCarState(object):
     def __init__(self, x0, y0, v0, theta0):
         self.E_x = x0
@@ -28,10 +37,71 @@ class UncontrolledKinematicCarState(object):
         self.E_v = v0
         self.E2_v = v0**2
         self.theta = SumOfRVs(theta0, [])
+    
+    def as_position_moments(self):
+        return UncontrolledKinematicCarPositionMoments(E_x = self.E_x, E_y = self.E_y, E_xy = self.E_xy, E2_x = self.E2_x, E2_y = self.E2_y)
 
 class UncontrolledCarIncremental(object):
     def __init__(self, x0, y0, v0, theta0):
-        self.state = UncontrolledKinematicCarState(x0, y0, v0, theta0)
+        self._state = UncontrolledKinematicCarState(x0, y0, v0, theta0)
+
+    @property
+    def state(self):
+        return copy(self._state)
+
+    def simulate(self, x0, y0, v0, theta0, w_thetas_samp, w_vs_samp):
+        """
+        Given deterministic outcomes for the random variables, simulate x and y
+        """
+        # Construct lists of theta and v across the full time horizon
+        # theta_t is just the sum theta_0 + theta_1 + ... + theta_{t-1}
+        thetas = list(accumulate([theta0] + w_thetas_samp))
+        cos_thetas = np.cos(thetas)
+        sin_thetas = np.sin(thetas)
+        vs = list(accumulate([v0] + w_vs_samp))
+        n_step = len(w_vs_samp) + 1
+        xs = n_step * [None]
+        ys = n_step * [None]
+        xs[0] = x0
+        ys[0] = y0
+        for i in range(1, n_step):
+            xs[i] = xs[i-1] + vs[i-1] * cos_thetas[i-1]
+            ys[i] = ys[i-1] + vs[i-1] * sin_thetas[i-1]
+        return xs, ys
+
+    def monte_carlo(self, x0, y0, v0, theta0, w_thetas, w_vs, n_samps):
+        # w_thetas_samps and w_vs_samps are lists of lists of samples
+        # across the full horizon.
+        w_thetas_samps = [w_thetas.sample() for i in range(n_samps)]
+        w_vs_samps = [w_vs.sample() for i in range(n_samps)]
+        n_t = w_vs.dimension() + 1 # Number of time steps
+        assert w_vs.dimension() == w_thetas.dimension()
+        # Each row represents one "sampled trajectory"
+        xs = np.zeros((n_samps, n_t))
+        ys = np.zeros((n_samps, n_t))
+        # TODO: STORE DAS DATA!
+        for i in range(n_samps):            
+            xs[i], ys[i] = self.simulate(x0, y0, v0, theta0, w_thetas_samps[i], w_vs_samps[i])
+        return xs, ys
+
+    def monte_carlo_onestep(self, x0, y0, w_theta, w_v, n_samps):
+        """
+        Given an initial position and two random variables
+        Assuming we start the car at theta = 0 and v = 0
+        Check with Monte Carlo...
+        """
+        w_v_samps = [w_v.sample() for i in range(n_samps)]
+        w_theta_samps = [w_theta.sample() for i in range(n_samps)]
+        x_samples = [x0 + v_samp * math.cos(theta_samp) for v_samp, theta_samp in zip(w_v_samps, w_theta_samps)]
+        y_samples = [y0 + v_samp * math.sin(theta_samp) for v_samp, theta_samp in zip(w_v_samps, w_theta_samps)]
+        xy_samples = [x * y for x,y in zip(x_samples, y_samples)]
+        E_x = np.mean(x_samples)
+        E_y = np.mean(y_samples)
+        E2_x = (1.0/len(x_samples)) * np.sum([x**2 for x in x_samples])
+        E2_y = (1.0/len(y_samples)) * np.sum([y**2 for y in y_samples])
+        E_xy = np.mean(xy_samples)
+        ans = {"E[x]": E_x, "E[y]": E_y, "E[x^2]": E2_x, "E[y^2]": E2_y, "E[xy]": E_xy}
+        return ans
 
     def propagate_moments(self, w_theta, w_v):
         """
@@ -51,72 +121,85 @@ class UncontrolledCarIncremental(object):
             E_yc: E[y_t cos(theta_t)]
             E_v: E[v_t]
             E2_v: E[v_t^2]
-            theta: instance of "SumOfRVs"
+            theta: theta_t, instance of "SumOfRVs"
         """
-        state = self.state # state is now an alias for self.state
+        state = self._state # state is now an alias for self._state
         cos_w_theta = CosSumOfRVs(0, [w_theta])
         sin_w_theta = SinSumOfRVs(0, [w_theta])
         cos_theta = state.theta.cos_applied()
         sin_theta = state.theta.sin_applied()
+
+        # Pre compute a bunch of relevant moments
         E_cos_theta_sin_theta = CrossSumOfRVs(cos_theta.c, cos_theta.random_variables).compute_moment(1)
+        E_cos_w_theta = cos_w_theta.compute_moment(1)
+        E_sin_w_theta = sin_w_theta.compute_moment(1)
+        E2_cos_theta = cos_theta.compute_moment(2)
+        E2_sin_theta = sin_theta.compute_moment(2)
+        E_w_v = w_v.compute_moment(1)
 
         # Compute E[x_{t+1} v_{t+1} sin(theta_{t+1})]
-        E_xvs_new = state.E_xvs * cos_w_theta.compute_moment(1) + state.E_xvc * sin_w_theta.compute_moment(1)\
-                    + state.E2_v * E_cos_theta_sin_theta * cos_w_theta.compute_moment(1)\
-                    + state.E2_v * sin_w_theta.compute_moment(1) * cos_w_theta.compute_moment(2)\
-                    + state.E_v * w_v.compute_moment(1) * E_cos_theta_sin_theta * cos_w_theta.compute_moment(1)\
-                    + state.E_v * w_v.compute_moment(1) * sin_w_theta.compute_moment(1) * cos_theta.compute_moment(2)\
-                    + w_v.compute_moment(1) * cos_w_theta.compute_moment(1) * state.E_xs\
-                    + w_v.compute_moment(1) * state.E_xc * sin_w_theta.compute_moment(1)
+        E_xvs_new = state.E_xvs * E_cos_w_theta + state.E_xvc * E_sin_w_theta\
+                    + state.E2_v * E_cos_theta_sin_theta * E_cos_w_theta\
+                    + state.E2_v * E_sin_w_theta * cos_w_theta.compute_moment(2)\
+                    + state.E_v * E_w_v * E_cos_theta_sin_theta * E_cos_w_theta\
+                    + state.E_v * E_w_v * E_sin_w_theta * E2_cos_theta\
+                    + E_w_v * state.E_xs * E_cos_w_theta\
+                    + E_w_v * state.E_xc * E_sin_w_theta
 
         # Compute E[x_{t+1} v_{t+1} cos(theta_{t+1})]
-        E_xvc_new = state.E_xvc * cos_w_theta.compute_moment(1) - state.E_xvc * sin_w_theta.compute_moment(1)\
-                    - state.E2_v * E_cos_theta_sin_theta * sin_w_theta.compute_moment(1) + state.E2_v * cos_theta.compute_moment(2) * cos_w_theta.compute_moment(1)\
-                    - state.E_v * w_v.compute_moment(1) * E_cos_theta_sin_theta * sin_w_theta.compute_moment(1)\
-                    + state.E_v * cos_theta.compute_moment(2) * w_v.compute_moment(1) * cos_w_theta.compute_moment(1)\
-                    - w_v.compute_moment(1) * sin_w_theta.compute_moment(1) * state.E_xs + w_v.compute_moment(1) * cos_w_theta.compute_moment(1) * state.E_xc
+        E_xvc_new = state.E_xvc * E_cos_w_theta - state.E_xvs * E_sin_w_theta\
+                    - state.E2_v * E_cos_theta_sin_theta * E_sin_w_theta\
+                    + state.E2_v * E2_cos_theta * E_cos_w_theta\
+                    - state.E_v * E_w_v * E_cos_theta_sin_theta * E_sin_w_theta\
+                    + state.E_v * E2_cos_theta * E_w_v * E_cos_w_theta\
+                    - E_w_v * E_sin_w_theta * state.E_xs\
+                    + E_w_v * E_cos_w_theta * state.E_xc
         
         # Compute E[y_{t+1} v_{t+1} sin(theta_{t+1})]
-        E_yvs_new = state.E_yvs * cos_w_theta.compute_moment(1) + state.E_yvc * sin_w_theta.compute_moment(1)\
-                    + state.E2_v * sin_theta.compute_moment(2) * cos_w_theta.compute_moment(1)\
-                    + state.E2_v * E_cos_theta_sin_theta * sin_w_theta.compute_moment(1)\
-                    + state.E_v * w_v.compute_moment(1) * sin_theta.compute_moment(2) * cos_w_theta.compute_moment(1)\
-                    + state.E_v * w_v.compute_moment(1) * sin_w_theta.compute_moment(1) * E_cos_theta_sin_theta\
-                    + w_v.compute_moment(1) * cos_w_theta.compute_moment(1) * state.E_ys\
-                    + w_v.compute_moment(1) * sin_w_theta.compute_moment(1) * state.E_yc
+        E_yvs_new = state.E_yvs * E_cos_w_theta + state.E_yvc * E_sin_w_theta\
+                    + state.E2_v * E2_sin_theta * E_cos_w_theta\
+                    + state.E2_v * E_cos_theta_sin_theta * E_sin_w_theta\
+                    + state.E_v * E_w_v * E2_sin_theta * E_cos_w_theta\
+                    + state.E_v * E_w_v * E_sin_w_theta * E_cos_theta_sin_theta\
+                    + E_w_v * E_cos_w_theta * state.E_ys\
+                    + E_w_v * E_sin_w_theta * state.E_yc
 
         # Compute E[y_{t+1} v_{t+1} cos(theta_{t+1})]
-        E_yvc_new = state.E_yvc * cos_w_theta.compute_moment(1) - state.E_yvs * sin_w_theta.compute_moment(1)\
-                    - state.E2_v * sin_theta.compute_moment(2) * sin_w_theta.compute_moment(1)\
-                    + state.E2_v * E_cos_theta_sin_theta * cos_w_theta.compute_moment(1)\
-                    - state.E_v * w_v.compute_moment(1) * sin_theta.compute_moment(2) * sin_w_theta.compute_moment(1)\
-                    + state.E_v * w_v.compute_moment(1) * E_cos_theta_sin_theta * cos_w_theta.compute_moment(1)\
-                    - w_v.compute_moment(1) * sin_w_theta.compute_moment(1) * state.E_ys\
-                    + w_v.compute_moment(1) * cos_w_theta.compute_moment(1) * state.E_yc
+        E_yvc_new = state.E_yvc * E_cos_w_theta - state.E_yvs * E_sin_w_theta\
+                    - state.E2_v * E2_sin_theta * E_sin_w_theta\
+                    + state.E2_v * E_cos_theta_sin_theta * E_cos_w_theta\
+                    - state.E_v * E_w_v * E2_sin_theta * E_sin_w_theta\
+                    + state.E_v * E_w_v * E_cos_theta_sin_theta * E_cos_w_theta\
+                    - E_w_v * E_sin_w_theta * state.E_ys\
+                    + E_w_v * E_cos_w_theta * state.E_yc
 
         # Compute E[x_{t+1} sin(theta_{t+1})]
-        E_xs_new = state.E_v * cos_w_theta.compute_moment(1) * E_cos_theta_sin_theta + state.E_v * sin_w_theta.compute_moment(1) * cos_theta.compute_moment(2)\
-                        + state.E_xs * cos_w_theta.compute_moment(1) + state.E_xc * sin_w_theta.compute_moment(1)
+        E_xs_new = state.E_v * E_cos_w_theta * E_cos_theta_sin_theta\
+                    + state.E_v * E_sin_w_theta * E2_cos_theta\
+                    + state.E_xs * E_cos_w_theta + state.E_xc * E_sin_w_theta
 
         # Compute E[x_{t+1} cos(theta_{t+1})]
-        E_xc_new = -state.E_v * sin_w_theta.compute_moment(1) * E_cos_theta_sin_theta + state.E_v *cos_theta.compute_moment(2) * cos_w_theta.compute_moment(1)\
-                    - state.E_xs * sin_w_theta.compute_moment(1) + state.E_xc * cos_w_theta.compute_moment(1)
+        E_xc_new = -state.E_v * E_sin_w_theta * E_cos_theta_sin_theta\
+                + state.E_v *E2_cos_theta * E_cos_w_theta\
+                - state.E_xs * E_sin_w_theta + state.E_xc * E_cos_w_theta
 
         # Compute E[y_{t+1} sin(theta_{t+1})]
-        E_ys_new = state.E_v * sin_theta.compute_moment(2) * cos_w_theta.compute_moment(1) + state.E_v * sin_w_theta.compute_moment(1) * E_cos_theta_sin_theta\
-                    + state.E_ys * cos_w_theta.compute_moment(1) + state.E_yc * sin_w_theta.compute_moment(1)
+        E_ys_new = state.E_v * E2_sin_theta * E_cos_w_theta\
+                + state.E_v * E_sin_w_theta * E_cos_theta_sin_theta\
+                + state.E_ys * E_cos_w_theta + state.E_yc * E_sin_w_theta
 
         # Compute E[y_{t+1} cos(theta_{t+1})]
-        E_yc_new = -state.E_v * sin_w_theta.compute_moment(1) * sin_theta.compute_moment(2) + state.E_v * cos_w_theta.compute_moment(1) * E_cos_theta_sin_theta\
-                    -state.E_ys * sin_w_theta.compute_moment(1) + state.E_yc * cos_w_theta.compute_moment(1)
+        E_yc_new = -state.E_v * E_sin_w_theta * E2_sin_theta\
+                + state.E_v * E_cos_w_theta * E_cos_theta_sin_theta\
+                -state.E_ys * E_sin_w_theta + state.E_yc * E_cos_w_theta
 
         # Compute E[v_{t+1}]
-        E_v_new = state.E_v + w_v.compute_moment(1)
+        E_v_new = state.E_v + E_w_v
 
         # Compute E[v_{t+1}^2] using the facts that:
         #    Sigma_{x + y} = Sigma_x + Sigma_y
         #    E[(x + y)^2] = Sigma_x + Sigma_y + E[x + y]^2
-        E2_v_new = (state.E2_v - state.E_v**2)+ w_v.compute_variance() + E_v_new**2
+        E2_v_new = (state.E2_v - state.E_v**2) + w_v.compute_variance() + E_v_new**2
 
         E_x_new = state.E_x + state.E_v * cos_theta.compute_moment(1)
         E_y_new = state.E_y + state.E_v * sin_theta.compute_moment(1)
@@ -125,10 +208,10 @@ class UncontrolledCarIncremental(object):
         E_xy_new = state.E2_v * E_cos_theta_sin_theta + state.E_xvs + state.E_yvc + state.E_xy
 
         # Update E[x_{t+1}^2]
-        E2_x_new = state.E2_v * cos_theta.compute_moment(2) + 2 * state.E_xvc + state.E2_x
+        E2_x_new = state.E2_v * E2_cos_theta + 2 * state.E_xvc + state.E2_x
 
         # Update E[y_{t+1}^2]
-        E2_y_new = state.E2_v * sin_theta.compute_moment(2) + 2 * state.E_yvs + state.E2_y
+        E2_y_new = state.E2_v * E2_sin_theta + 2 * state.E_yvs + state.E2_y
         
         state.E_x = E_x_new
         state.E_y = E_y_new

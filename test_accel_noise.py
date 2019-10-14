@@ -1,7 +1,7 @@
 from random_vector import RandomVector, cBetaRandomVariable
 import numpy as np
 from stochastic_verification_functions import StochasticVerificationFunction
-from kinematic_car import *
+from models import *
 import time
 
 p = lambda x,y: x**2 + 0.1 * y**2 - 1

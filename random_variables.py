@@ -8,18 +8,24 @@ from scipy.stats import norm
 class RandomVariable(object):
     def __init__(self):
         pass
-
+    
+    """
+    Virtual methods.
+    """
     def compute_moment(self, order):
         raise NotImplementedError("Method compute_moments() is not implemented.")
-
-    def compute_moments(self, order):
-        return [self.compute_moment(i) for i in range(order + 1)]
 
     def sample(self):
         raise NotImplementedError("Method sample() is not implemented.")
 
     def compute_characteristic_function(self, t):
         raise NotImplementedError("Method compute_characteristic_function() is not implemented.")
+    
+    """
+    Implemented methods.
+    """
+    def compute_moments(self, order):
+        return [self.compute_moment(i) for i in range(order + 1)]
 
     def compute_variance(self):
         return self.compute_moment(2) - self.compute_moment(1)**2
@@ -39,6 +45,39 @@ class RandomVector(object):
     def sample(self):
         return [var.sample() for var in self.random_variables]
 
+    def dimension(self):
+        return len(self.random_variables)
+
+class MixtureModel(RandomVariable):
+    def __init__(self, component_random_variables):
+        """
+        component_random_variables: tuples with (RandomVariable corresponding to a mode, probability of the mode)
+        """
+        self.component_random_variables = [rv for rv, prob in component_random_variables]
+        self.component_probabilities = [prob for rv, prob in component_random_variables]
+        if sum(self.component_probabilities) != 1.0:
+            raise Exception("Input component probabilities must sum to 1")
+
+    def compute_moment(self, order):
+        moment = 0
+        for rv, prob in zip(self.component_random_variables, self.component_probabilities):
+            moment += prob * rv.compute_moment(order)
+        return moment
+
+    def compute_characteristic_function(self, t):
+        char_fun = 0
+        for rv, prob in zip(self.component_random_variables, self.component_probabilities):
+            char_fun += prob * rv.compute_characteristic_function(t)
+        return char_fun
+
+    def sample(self):
+        # Draw one sample from the multinomial distribution
+        # np.random.multinomial(1, [0.2, 0.8]) for example will return either
+        # array([0, 1]) or array([1, 0]) where the index of the 1 corresponds to
+        # the variable chosen.
+        mode_idx = list(np.random.multinomial(1, self.component_probabilities)).index(1)
+        return self.component_random_variables[mode_idx].sample()
+
 class Normal(RandomVariable):
     def __init__(self, mean, std):
         self.mean = mean
@@ -49,27 +88,10 @@ class Normal(RandomVariable):
         return norm.moment(order, loc = self.mean, scale = self.std)
     
     def compute_characteristic_function(self, t):
-        return cmath.exp(complex(0, -self.mean * t)) * cmath.exp(-0.5 * self.variance * t**2)
-
-
-class MixtureModel(RandomVariable):
-    def __init__(self, component_random_variables):
-        """
-        component_random_variables: tuples with (RandomVariable corresponding to a mode, probability of the mode)
-        """
-        self.component_random_variables = component_random_variables
-
-    def compute_moment(self, order):
-        moment = 0
-        for rv, prob in self.component_random_variables:
-            moment += prob * rv.compute_moment(order)
-        return moment
-
-    def compute_characteristic_function(self, t):
-        char_fun = 0
-        for rv, prob in self.component_random_variables:
-            char_fun += prob * rv.compute_characteristic_function(t)
-        return char_fun
+        return cmath.exp(complex(-0.5 * self.variance * t**2, self.mean * t))
+    
+    def sample(self):
+        return np.random.normal(self.mean, self.std)
 
 class Constant(RandomVariable):
     def __init__(self, value):
@@ -145,19 +167,24 @@ class CosSumOfRVs(RandomVariable):
         self.random_variables = random_variables
 
     def compute_moment(self, order):
-        n = math.floor(order/2)
-        # The ith element of real_component is the real component of CharacteristicFunction(i)
-        char_fun_values = [self.compute_characteristic_function(i) for i in range(order + 1)]
-        real_component = [np.real(val) for val in char_fun_values]
-        # Different expressions depending on if the order is odd or even
-        if order % 2 == 0:
-            summation = sum([comb(order, k) * real_component[2 * (n - k)] for k in range(n)])
-            return (1.0/(2.0**(2.0 * n))) * comb(order, n) + (1.0/(2.0**(2.0 * n - 1))) * summation
-        elif order % 2 == 1:
-            summation = sum([comb(2 * n + 1, k) * real_component[2 * n + 1 - 2 * k] for k in range(n + 1)])
-            return (1.0/(4.0**n)) * summation
+        if order == 1:
+            return np.real(self.compute_characteristic_function(1))
+        elif order > 1:
+            n = math.floor(order/2)
+            # The ith element of real_component is the real component of CharacteristicFunction(i)
+            char_fun_values = [self.compute_characteristic_function(i) for i in range(order + 1)]
+            real_component = [np.real(val) for val in char_fun_values]
+            # Different expressions depending on if the order is odd or even
+            if order % 2 == 0:
+                summation = sum([comb(order, k) * real_component[2 * (n - k)] for k in range(n)])
+                return (1.0/(2.0**(2.0 * n))) * comb(order, n) + (1.0/(2.0**(2.0 * n - 1))) * summation
+            elif order % 2 == 1:
+                summation = sum([comb(2 * n + 1, k) * real_component[2 * n + 1 - 2 * k] for k in range(n + 1)])
+                return (1.0/(4.0**n)) * summation
+            else:
+                raise Exception("Input order mod 2 is neither 0 nor 1")
         else:
-            raise Exception("Input order mod 2 is neither 0 nor 1")
+            raise Exception("Input order must be positive.")
 
     def compute_moments(self, order):
             return [self.compute_moment(i) for i in range(order + 1)]
@@ -186,20 +213,25 @@ class SinSumOfRVs(RandomVariable):
         self.random_variables = random_variables
 
     def compute_moment(self, order):
-        n = math.floor(order/2)
-        # The ith element of real_component is the real component of CharacteristicFunction(i)
-        char_fun_values = [self.compute_characteristic_function(i) for i in range(order + 1)]
-        real_component = [np.real(val) for val in char_fun_values]
-        imaginary_component = [np.imag(val) for val in char_fun_values]
-        # Different expressions depending on if the order is odd or even
-        if order % 2 == 0:
-            summation = sum([((-1)**k) * comb(order, k) * real_component[2 * (n - k)] for k in range(n)])
-            return (1.0/(2.0**(2.0 * n))) * comb(order, n) + (((-1)**n)/ (2**(2 * n - 1))) * summation
-        elif order % 2 == 1:
-            summation = sum([((-1)**k) * comb(order, k) * imaginary_component[2 * n + 1 - 2 * k] for k in range(n+1)])
-            return (((-1)**n)/(4**n)) * summation
+        if order == 1:
+            return np.imag(self.compute_characteristic_function(1))
+        elif order > 1:
+            n = math.floor(order/2)
+            # The ith element of real_component is the real component of CharacteristicFunction(i)
+            char_fun_values = [self.compute_characteristic_function(i) for i in range(order + 1)]
+            real_component = [np.real(val) for val in char_fun_values]
+            imaginary_component = [np.imag(val) for val in char_fun_values]
+            # Different expressions depending on if the order is odd or even
+            if order % 2 == 0:
+                summation = sum([((-1)**k) * comb(order, k) * real_component[2 * (n - k)] for k in range(n)])
+                return (1.0/(2.0**(2.0 * n))) * comb(order, n) + (((-1)**n)/ (2**(2 * n - 1))) * summation
+            elif order % 2 == 1:
+                summation = sum([((-1)**k) * comb(order, k) * imaginary_component[2 * n + 1 - 2 * k] for k in range(n+1)])
+                return (((-1)**n)/(4**n)) * summation
+            else:
+                raise Exception("Input order mod 2 is neither 0 nor 1")
         else:
-            raise Exception("Input order mod 2 is neither 0 nor 1")
+            raise Exception("Input order must be positive.")
 
     def compute_moments(self, order):
         return [self.compute_moment(i) for i in range(order + 1)]
