@@ -67,7 +67,7 @@ class UncontrolledCarIncremental(object):
         for i in range(1, n_step):
             xs[i] = xs[i-1] + vs[i-1] * cos_thetas[i-1]
             ys[i] = ys[i-1] + vs[i-1] * sin_thetas[i-1]
-        return xs, ys
+        return xs, ys, vs, thetas
 
     def monte_carlo(self, x0, y0, v0, theta0, w_thetas, w_vs, n_samps):
         # w_thetas_samps and w_vs_samps are lists of lists of samples
@@ -81,7 +81,7 @@ class UncontrolledCarIncremental(object):
         ys = np.zeros((n_samps, n_t))
         # TODO: STORE DAS DATA!
         for i in range(n_samps):            
-            xs[i], ys[i] = self.simulate(x0, y0, v0, theta0, w_thetas_samps[i], w_vs_samps[i])
+            xs[i], ys[i], _, _ = self.simulate(x0, y0, v0, theta0, w_thetas_samps[i], w_vs_samps[i])
         return xs, ys
 
     def monte_carlo_onestep(self, x0, y0, w_theta, w_v, n_samps):
@@ -103,7 +103,18 @@ class UncontrolledCarIncremental(object):
         ans = {"E[x]": E_x, "E[y]": E_y, "E[x^2]": E2_x, "E[y^2]": E2_y, "E[xy]": E_xy}
         return ans
 
-    def propagate_moments(self, w_theta, w_v):
+    def propagate_moments(self, w_thetas, w_vs):
+        """
+        w_thetas: instance of RandomVector
+        w_vs: instance of RandomVector
+        """
+        states = [self.state]
+        for i in range(w_thetas.dimension()):
+            self.propagate_one_step(w_thetas.random_variables[i], w_vs.random_variables[i])
+            states.append(self.state)
+        return states
+
+    def propagate_one_step(self, w_theta, w_v):
         """
         State:
             E_x = E[x_t]

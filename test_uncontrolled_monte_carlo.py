@@ -6,6 +6,8 @@ import time
 import cProfile, pstats, io
 from pstats import SortKey
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+from matplotlib.offsetbox import TextArea, DrawingArea, OffsetImage, AnnotationBbox
 
 def percent_error(approx, exact):
     return 100 * (abs(approx - exact)/exact)
@@ -26,13 +28,6 @@ def compute_percent_errors(sampled_moments, propagated_moments):
     print("E[xy] percent error: " + str(E_xy_error))
     print("E[x^2] percent error: " + str(E2_x_error))
     print("E[y^2] percent error: " + str(E2_y_error))
-
-def simulate(model, wthetas, wvs):
-    objs = [model.state]
-    for i in range(wthetas.dimension()):
-        model.propagate_moments(wthetas.random_variables[i], wvs.random_variables[i])
-        objs.append(model.state)
-    return objs
 
 def compute_sample_moments(xs, ys):
     """
@@ -77,15 +72,20 @@ mm.plot_histogram(10000, bins = 'doane')
 wthetas = RandomVector([mm for i in range(n_t)])
 
 car_model = UncontrolledCarIncremental(x0, y0, v0, theta0)
-prop_moments = simulate(car_model, wthetas, wvs)
-xs, ys = car_model.monte_carlo(x0, y0, v0, theta0, wthetas, wvs, int(1e6))
+prop_moments = car_model.propagate_moments(wthetas, wvs)
+xs, ys = car_model.monte_carlo(x0, y0, v0, theta0, wthetas, wvs, int(1e5))
 sample_moments = compute_sample_moments(xs, ys)
 
 for sm, pm in zip(sample_moments, prop_moments):
     compute_percent_errors(sm, pm.as_position_moments())
-    
-plt.scatter(xs[0:100, :], ys[0:100, :])
-plt.xlabel("X Position")
-plt.ylabel("Y Position")
-plt.title("Car Positions Over Time")
-plt.show()
+
+
+# fig, ax = plt.subplots()
+# car_svg = mpimg.imread('car.svg')
+# imagebox = OffsetImage(car_svg, zoom=0.2)
+# ax.add_artist(imagebox)
+# # plt.scatter(xs[0:100, :], ys[0:100, :])
+# # plt.xlabel("X Position")
+# # plt.ylabel("Y Position")
+# # plt.title("Car Positions Over Time")
+# plt.show()
