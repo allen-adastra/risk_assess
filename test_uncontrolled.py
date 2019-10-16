@@ -59,6 +59,11 @@ car_coord_ellipse = Ellipse(1, 3, 0, 0, 0)
 verifier = PlanVerifier(x0_ego, y0_ego, v0_ego, theta0_ego, accels, steers, car_coord_ellipse)
 
 t_start = time.time()
+
+pr = cProfile.Profile()
+pr.enable()
 prob_bounds = verifier.check_uncertain_agent(agent, 10)
-print("Total time: " + str(time.time() - t_start))
-print(prob_bounds)
+pr.disable()
+sortby = 'cumtime'
+ps = pstats.Stats(pr).sort_stats(sortby)
+ps.print_stats()
