@@ -2,6 +2,7 @@ from geom_utils import Ellipse
 from models import UncontrolledCarIncremental
 import numpy as np
 import math
+import time
 
 class PlanVerifier(object):
     def __init__(self, x0, y0, v0, theta0, accels, steers, car_coord_ellipse):
@@ -44,7 +45,9 @@ class PlanVerifier(object):
         For the time horizon, find the chebyshev bound!
         """
         ts = np.linspace(0, 2 * math.pi, n_lines)
-        half_space_sets = [set(e.generate_halfspaces_containing_ellipse(ts)) for e in self.ellipses]
+        half_space_sets = len(self.ellipses) * [None]
+        for i, e in enumerate(self.ellipses):
+            half_space_sets[i] = set(e.generate_halfspaces_containing_ellipse(ts))
         moments = uncertain_agent.propgate_moments()
         prob_bounds = len(moments) * [None]
         for i in range(len(moments)):

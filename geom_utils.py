@@ -1,10 +1,6 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-import time
-def rotation_matrix(theta):
-    return np.array([[math.cos(theta), math.sin(theta)],
-                    [-math.sin(theta), math.cos(theta)]])
 
 class HalfSpace(object):
     """
@@ -107,7 +103,10 @@ class Ellipse(object):
                                [self.y_center]])
         # Rotate the points xys_unrotated_origin by theta then offset by offset_vec to arrive
         # at the desried points on the ellipse. Note that rotation must go first.
-        xys = np.add(np.matmul(rotation_matrix(-self.theta), xys_unrotated_origin), offset_vec)
+        theta = -self.theta
+        rotation_matrix = np.array([[math.cos(theta), math.sin(theta)],
+                    [-math.sin(theta), math.cos(theta)]])
+        xys = np.add(np.matmul(rotation_matrix, xys_unrotated_origin), offset_vec)
 
         # y = m(x - x1) + y1
         # y - mx + mx1 - y1 = 0
@@ -116,7 +115,6 @@ class Ellipse(object):
         lines = n_lines * [None]
         for i in range(n_lines):
             lines[i] = Line(a1 = -ms[i], a2 = 1, b = ms[i] * xys[0,i] - xys[1,i])
-
         # TEST CODE:
         if test:
             xs_lines = [list(np.linspace(xys[0,i] - 2, xys[0,i] + 2, 100)) for i in range(n_lines)]
