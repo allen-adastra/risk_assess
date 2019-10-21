@@ -58,6 +58,42 @@ class RandomVector(object):
     def dimension(self):
         return len(self.random_variables)
 
+"""
+Finite State Time-Homogenous Markov Chain. 
+"""
+class MarkovChain(object):
+    def __init__(self, T, p0):
+        """
+        T: n x n transition matrix
+        p0: n x 1 vector of transition probabilities
+        """
+        self.T = T
+        self.p0 = p0
+
+        # Dictionary mapping time step "i" to a vector of the
+        # marginal probabilities at time "i"
+        self.marginal_probabilities = {0 : p0}
+
+    def get_marginal_vector(self, n_step):
+        """
+        Get the vector of marginal probabilities at time n_step.
+        """
+        assert isinstance(n_step, int) == True
+        assert n_step >= 0
+        if n_step not in self.marginal_probabilities.keys():
+            # In this case, we don't have the desired marginal probability vector yet.
+
+            # Identify the highest time step for which we have 
+            # the vector of marginal probabilities
+            max_i = max(self.marginal_probabilities.keys())
+
+            # Propagate marginal probabilities forward in time.
+            for i in range(max_i, n_step):
+                # The vector of marginal probabilities at time t + 1 is the transition matrix multiplied
+                # by the vector of marginal probabilities at time t
+                self.marginal_probabilities[i + 1] = np.matmul(self.T, self.marginal_probabilities[i])
+        return self.marginal_probabilities[n_step]
+
 class MixtureModel(RandomVariable):
     def __init__(self, component_random_variables):
         """
