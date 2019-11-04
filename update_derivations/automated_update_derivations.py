@@ -122,6 +122,7 @@ def iterate_relations(relations_to_check, base_variables, variable_dependence_gr
     for relation in relations_to_check:
         new_update_relations_needed, variables_need_higher_moments = identify_needed_updates(relation, base_variables, variable_dependence_graph, terms_with_generated_relations)
         need_update_relations += new_update_relations_needed
+
     # Eliminate redundant stuff
     need_update_relations = {frozenset(s) for s in need_update_relations}
     need_update_relations = [set(s) for s in need_update_relations]
@@ -129,56 +130,4 @@ def iterate_relations(relations_to_check, base_variables, variable_dependence_gr
     # Generate new relations based off what we have in need_update_relations
     new_relations_to_check = generate_new_update_relations(need_update_relations, base_variables)
     terms_with_generated_relations += need_update_relations
-    time.sleep(0.5)
     return new_relations_to_check, terms_with_generated_relations
-
-# Declare variables at time "t"
-xt = sp.Symbol("x_t")
-yt = sp.Symbol("y_t")
-vt = sp.Symbol("v_t")
-wvt = sp.Symbol("w_{v_t}")
-wthetat = sp.Symbol("w_{theta_t}")
-thetat = sp.Symbol("theta_t")
-cos_thetat = sp.cos(thetat)
-sin_thetat = sp.sin(thetat)
-sin_thetat = sp.sin(thetat)
-cos_thetat = sp.cos(thetat)
-sin_wthetat = sp.sin(wthetat)
-cos_wthetat = sp.cos(wthetat)
-
-# Create a list of variables at time "t"
-# Indicies for the variables:
-# 0 : xt
-# 1 : yt
-# 2 : vt
-# 3 : sin_thetat
-# 4 : cos_thetat
-# 5 : sin_wthetat
-# 6 : cos_wthetat
-
-xt_base = BaseVariable(xt, 1,  xt + vt * cos_thetat)
-yt_base = BaseVariable(yt, 1, yt + vt * sin_thetat)
-vt_base = BaseVariable(vt, 2, vt + wvt)
-sin_thetat_base = BaseVariable(sin_thetat, 1000, sp.expand_trig(sp.sin(thetat + wthetat)))
-cos_thetat_base = BaseVariable(cos_thetat, 1000, sp.expand_trig(sp.cos(thetat + wthetat)))
-sin_wthetat_base = BaseVariable(sin_wthetat, 0, None)
-cos_wthetat_base = BaseVariable(cos_wthetat, 0, None)
-
-base_variables = BaseVariables([xt_base, yt_base, vt_base, sin_thetat_base, cos_thetat_base, sin_wthetat_base, cos_wthetat_base])
-
-variable_dependence_graph = nx.Graph()
-variable_dependence_graph.add_nodes_from(base_variables.sympy_rep)
-variable_dependence_graph.add_edges_from([(xt, yt), (xt, vt), (yt, vt), (xt, sin_thetat), (xt, cos_thetat), (yt, sin_thetat), (yt, cos_thetat)])
-
-# Expressions we have update relations for.
-terms_with_generated_relations = [set([xt, sin_thetat]), set([xt, cos_thetat]), set([yt, sin_thetat]), set([yt, cos_thetat])]
-
-# Construct the expression for E[x_{t+1} * y_{t+1}] in terms of expressions at time t
-cross = sp.poly(xt_base.update_relation * yt_base.update_relation, base_variables.sympy_rep)
-terms_with_generated_relations += [set([xt, yt])]
-relations_to_check = [cross]
-
-i = 0
-
-while relations_to_check:
-    relations_to_check, terms_with_generated_relations = iterate_relations(relations_to_check, base_variables, variable_dependence_graph, terms_with_generated_relations)
