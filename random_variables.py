@@ -223,6 +223,7 @@ class SumOfRVs(object):
     def add_rv(self, rv):
         self.random_variables.append(rv)
 
+
 """
 Let x1, x2, ..., xn be n independent random variables and c be some constant.
 This object is the random variable cos(c + x1 + x2 + ... + xn)
