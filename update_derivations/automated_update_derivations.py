@@ -172,8 +172,8 @@ def iterate_relations(derived_base_vars_to_check, base_variables, variable_depen
         need_update_relations += new_update_relations_needed
 
     if len(variables_need_higher_moments):
-        raise Exception("We haven't figured out yet what to do when certain variables need higher moments.")
-    
+        raise Exception("There were variables that need higher moments, but we haven't figured out yet what to do when certain variables need higher moments.")
+
     # Generate new relations based off what we have in need_update_relations
     new_derived_base_vars = generate_new_update_relations(need_update_relations, base_variables)
     derived_base_vars += new_derived_base_vars

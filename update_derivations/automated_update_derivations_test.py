@@ -20,10 +20,10 @@ class TestClass:
         self._xt = BaseVariable(xt, 1,  xt+ vt * cos_thetat)
         self._yt = BaseVariable(yt, 1, yt + vt * sin_thetat)
         self._vt = BaseVariable(vt, 2, vt + wvt)
-        self._sin_thetat = BaseVariable(sin_thetat, 1000, sp.expand_trig(sp.sin(thetat + wthetat)))
-        self._cos_thetat = BaseVariable(cos_thetat, 1000, sp.expand_trig(sp.cos(thetat + wthetat)))
-        self._sin_wthetat = BaseVariable(sin_wthetat, 0, None)
-        self._cos_wthetat = BaseVariable(cos_wthetat, 0, None)
+        self._sin_thetat = BaseVariable(sin_thetat, float("inf"), sp.expand_trig(sp.sin(thetat + wthetat)))
+        self._cos_thetat = BaseVariable(cos_thetat, float("inf"), sp.expand_trig(sp.cos(thetat + wthetat)))
+        self._sin_wthetat = BaseVariable(sin_wthetat, float("inf"), None)
+        self._cos_wthetat = BaseVariable(cos_wthetat, float("inf"), None)
 
         self._base_variables = BaseVariables([self._xt, self._yt, self._vt, self._sin_thetat,
                                             self._cos_thetat, self._sin_wthetat, self._cos_wthetat])
@@ -84,6 +84,9 @@ class TestClass:
         assert {self._yt, self._vt, self._sin_thetat} in derived_base_variables_components
         assert {self._yt, self._vt, self._cos_thetat} in derived_base_variables_components
         assert len(derived_base_variables_components) == 9
+        for var in derived_base_variables:
+            print("Update relation for " + str(var.component_variables_sympy))
+            print(var.update_relation)
 
     def test_derived_base_var(self):
         x = BaseVariable(sp.Symbol('x'), 1, None)
