@@ -1,4 +1,4 @@
-from random_variables import RandomVector, cBetaRandomVariable
+from random_objectss import RandomVector, cBetaRandomVariable
 import numpy as np
 from stochastic_verification_functions import StochasticVerificationFunction
 from models import *

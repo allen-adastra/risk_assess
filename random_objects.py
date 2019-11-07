@@ -92,15 +92,20 @@ class MarkovChain(object):
                 # The vector of marginal probabilities at time t + 1 is the transition matrix multiplied
                 # by the vector of marginal probabilities at time t
                 self.marginal_probabilities[i + 1] = np.matmul(self.T, self.marginal_probabilities[i])
-        return self.marginal_probabilities[n_step]
+        return self.marginal_probabilities[n_step]    
+
+class MixtureComponent(object):
+    def __init__(self, random_variable, weight):
+        self.rv = random_variable
+        self.weight = weight
 
 class MixtureModel(RandomVariable):
-    def __init__(self, component_random_variables):
+    def __init__(self, mixture_components):
         """
-        component_random_variables: tuples with (RandomVariable corresponding to a mode, probability of the mode)
+        component_random_variables: list of instances of MixtureComponent
         """
-        self.component_random_variables = [rv for rv, prob in component_random_variables]
-        self.component_probabilities = [prob for rv, prob in component_random_variables]
+        self.component_random_variables = [comp.rv for comp in mixture_components]
+        self.component_probabilities = [comp.weight for comp in mixture_components]
         sum_probs = sum(self.component_probabilities)
         if abs(sum_probs - 1) != 0:
             raise Exception("Input component probabilities must sum to 1, it sums to: " + str(sum_probs))

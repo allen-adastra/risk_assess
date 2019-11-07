@@ -1,4 +1,4 @@
-from random_variables import *
+from random_objectss import *
 import numpy as np
 from stochastic_verification_functions import StochasticVerificationFunction
 import time
