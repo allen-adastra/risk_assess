@@ -1,4 +1,8 @@
-from random_objectss import *
+import os 
+import sys
+from os import path
+sys.path.append(path.dirname(path.abspath(__file__)) + '/../')
+from random_objects import *
 import numpy as np
 from stochastic_verification_functions import StochasticVerificationFunction
 import time
@@ -75,3 +79,8 @@ class Model(object):
 
         self.steers.append(steer)
         self.rv_omegas.append(rv_omega)
+if __name__ == "__main__":
+    m = Model(1, 1, 1, 1)
+    n = Normal(0, 1)
+    for i in range(10):
+        m.update(1, 0.01,n, n , n, n)

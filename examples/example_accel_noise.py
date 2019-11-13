@@ -1,4 +1,8 @@
-from random_vector import RandomVector, cBetaRandomVariable
+import os 
+import sys
+from os import path
+sys.path.append(path.dirname(path.abspath(__file__)) + '/../')
+from random_objects import *
 import numpy as np
 from stochastic_verification_functions import StochasticVerificationFunction
 from models import *

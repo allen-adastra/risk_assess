@@ -1,4 +1,8 @@
-from random_objectss import RandomVector, cBetaRandomVariable
+import os 
+import sys
+from os import path
+sys.path.append(path.dirname(path.abspath(__file__)) + '/../')
+from random_objects import *
 import numpy as np
 from stochastic_verification_functions import StochasticVerificationFunction
 from models import *
@@ -64,9 +68,9 @@ v0 = 1.0
 theta0 = 0.5
 wvs = RandomVector([Normal(1.0, 0.05) for i in range(n_t)])
 
-central_component = (Normal(0.0, 0.001), 0.6)
-left_component = (Normal(0.3, 0.03), 0.25)
-right_component = (Normal(-0.3, 0.03), 0.15)
+central_component = MixtureComponent(Normal(0.0, 0.001), 0.6)
+left_component = MixtureComponent(Normal(0.3, 0.03), 0.25)
+right_component = MixtureComponent(Normal(-0.3, 0.03), 0.15)
 mm = MixtureModel([central_component, left_component, right_component])
 mm.plot_histogram(10000, bins = 'doane')
 wthetas = RandomVector([mm for i in range(n_t)])
@@ -78,14 +82,3 @@ sample_moments = compute_sample_moments(xs, ys)
 
 for sm, pm in zip(sample_moments, prop_moments):
     compute_percent_errors(sm, pm.as_position_moments())
-
-
-# fig, ax = plt.subplots()
-# car_svg = mpimg.imread('car.svg')
-# imagebox = OffsetImage(car_svg, zoom=0.2)
-# ax.add_artist(imagebox)
-# # plt.scatter(xs[0:100, :], ys[0:100, :])
-# # plt.xlabel("X Position")
-# # plt.ylabel("Y Position")
-# # plt.title("Car Positions Over Time")
-# plt.show()
