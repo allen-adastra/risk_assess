@@ -1,15 +1,20 @@
-from plan_verification.geom_utils import Ellipse
-from plan_verification.models import UncontrolledCarIncremental
+from geom_utils import Ellipse
+from models import simulate_deterministic, UncontrolledCar
 import numpy as np
 import math
 import time
 
 class PlanVerifier(object):
-    def __init__(self, x0, y0, v0, theta0, accels, steers, car_coord_ellipse):
-        self.deterministic_model = UncontrolledCarIncremental(x0, y0, v0, theta0)
-
+    def __init__(self, initial_state, accels, steers, car_coord_ellipse):
+        """
+        Args:
+            initial_state: instance of CarState
+            accels: deterministic control sequence for the ego vehicle
+            steers: deterministic control sequence for the ego vehicle
+            car_coord_ellipse: instance of Ellipse defining an ellipse in the cars coordinates
+        """
         # Simulate to get self.xs, self.ys, self.thetas
-        self.xs, self.ys, self.vs, self.thetas = self.deterministic_model.simulate(x0, y0, v0, theta0, steers, accels)
+        self.xs, self.ys, self.vs, self.thetas = simulate_deterministic(initial_state, steers, accels)
         self.ellipses = self.generate_ellipses(car_coord_ellipse)
 
     def generate_ellipses(self, car_coord_ellipse):
@@ -30,7 +35,7 @@ class PlanVerifier(object):
         """
         Args:
             half_space: instance of HalfSpace
-            moments: instance of UncontrolledKinematicCarState
+            moments: instance of UncontrolledCarState
         In this function, we think of the random variable z = a1 * x + a2 * y + b
         """
         l = half_space.line

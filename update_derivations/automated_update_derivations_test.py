@@ -13,7 +13,6 @@ class TestClass:
         thetat = sp.Symbol("theta_t")
         cos_thetat = sp.cos(thetat)
         sin_thetat = sp.sin(thetat)
-
         sin_wthetat = sp.sin(wthetat)
         cos_wthetat = sp.cos(wthetat)
 
@@ -69,7 +68,6 @@ class TestClass:
         while derived_base_variables_to_check:
             derived_base_variables_to_check, derived_base_variables = iterate_relations(derived_base_variables_to_check, self._base_variables, self._variable_dependence_graph, derived_base_variables)
             iters += 1
-
         # It should take three iterations for the given problem.
         assert iters == 3 
         # The resulting derived variables should be the following nine, and no others.
@@ -84,6 +82,7 @@ class TestClass:
         assert {self._yt, self._vt, self._sin_thetat} in derived_base_variables_components
         assert {self._yt, self._vt, self._cos_thetat} in derived_base_variables_components
         assert len(derived_base_variables_components) == 9
+        
         for var in derived_base_variables:
             print("Update relation for " + str(var.component_variables_sympy))
             print(var.update_relation)

@@ -2,6 +2,17 @@ import sympy as sp
 import networkx as nx
 import time
 
+class UpdateDeriver(object):
+    def __init__(self, base_variables, dependence_graph):
+        """
+        Args:
+            base_variables: instances of BaseVariables
+            dependence_graph: networkx graph with nodes as instances of BaseVariable and edges between two variables if they are dependent
+        """
+        self._base_variables = base_variables
+        self._variable_dependence_graph = dependence_graph
+
+
 class BaseVariables(object):
     def __init__(self, base_variables):
         """
@@ -94,7 +105,7 @@ class DerivedVariable(BaseVariable):
         set_of_sympy_vars: is the product of the sympy vars in this set equivalent to this variable?
         """
         return set_of_sympy_vars == {var.sympy_rep for var in self.component_variables}
-    
+
 
 def identify_needed_updates(derived_variable_to_check, base_variables, dependence_graph, derived_variables):
     """

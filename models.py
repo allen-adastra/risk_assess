@@ -5,6 +5,31 @@ import math
 from random_objects import *
 from copy import copy
 
+
+def simulate_deterministic(initial_state, steers, accels):
+    """
+    Given an initial state and control inputs for a horizon, simulate the deterministic model.
+    Args:
+        initial_state: instance of CarState
+        steers: control sequence
+        accels: control sequence
+    """
+    # Construct lists of theta and v across the full time horizon
+    # theta_t is just the sum theta_0 + theta_1 + ... + theta_{t-1}
+    thetas = list(accumulate([initial_state.theta] + steers))
+    cos_thetas = np.cos(thetas)
+    sin_thetas = np.sin(thetas)
+    vs = list(accumulate([initial_state.v] + accels))
+    n_step = len(accels) + 1
+    xs = n_step * [None]
+    ys = n_step * [None]
+    xs[0] = initial_state.x
+    ys[0] = initial_state.y
+    for i in range(1, n_step):
+        xs[i] = xs[i-1] + vs[i-1] * cos_thetas[i-1]
+        ys[i] = ys[i-1] + vs[i-1] * sin_thetas[i-1]
+    return xs, ys, vs, thetas
+
 class InputVariables(object):
   def __init__(self, **attrs):
     for name, value in attrs.items():
@@ -19,7 +44,14 @@ class UncontrolledKinematicCarPositionMoments(object):
         self.E2_x = E2_x
         self.E2_y = E2_y
 
-class UncontrolledKinematicCarState(object):
+class CarState(object):
+    def __init__(self, x0, y0, v0, theta0):
+        self.x = x0
+        self.y = y0
+        self.v = v0
+        self.theta = theta0
+
+class UncontrolledCarState(object):
     def __init__(self, x0, y0, v0, theta0):
         self.E_x = x0
         self.E_y = y0
@@ -41,33 +73,17 @@ class UncontrolledKinematicCarState(object):
     def as_position_moments(self):
         return UncontrolledKinematicCarPositionMoments(E_x = self.E_x, E_y = self.E_y, E_xy = self.E_xy, E2_x = self.E2_x, E2_y = self.E2_y)
 
-class UncontrolledCarIncremental(object):
-    def __init__(self, x0, y0, v0, theta0):
-        self._state = UncontrolledKinematicCarState(x0, y0, v0, theta0)
+class UncontrolledCar(object):
+    def __init__(self, initial_state):
+        """
+        Args:
+            initial_state: instance of UncontrolledCarState
+        """
+        self._state =initial_state
 
     @property
     def state(self):
         return copy(self._state)
-
-    def simulate(self, x0, y0, v0, theta0, w_thetas_samp, w_vs_samp):
-        """
-        Given deterministic outcomes for the random variables, simulate x and y
-        """
-        # Construct lists of theta and v across the full time horizon
-        # theta_t is just the sum theta_0 + theta_1 + ... + theta_{t-1}
-        thetas = list(accumulate([theta0] + w_thetas_samp))
-        cos_thetas = np.cos(thetas)
-        sin_thetas = np.sin(thetas)
-        vs = list(accumulate([v0] + w_vs_samp))
-        n_step = len(w_vs_samp) + 1
-        xs = n_step * [None]
-        ys = n_step * [None]
-        xs[0] = x0
-        ys[0] = y0
-        for i in range(1, n_step):
-            xs[i] = xs[i-1] + vs[i-1] * cos_thetas[i-1]
-            ys[i] = ys[i-1] + vs[i-1] * sin_thetas[i-1]
-        return xs, ys, vs, thetas
 
     def monte_carlo(self, x0, y0, v0, theta0, w_thetas, w_vs, n_samps):
         # w_thetas_samps and w_vs_samps are lists of lists of samples
