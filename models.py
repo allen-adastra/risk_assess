@@ -151,15 +151,13 @@ class UncontrolledCar(object):
             theta: theta_t, instance of "SumOfRVs"
         """
         state = self._state # state is now an alias for self._state
-        cos_w_theta = CosSumOfRVs(0, [w_theta])
-        sin_w_theta = SinSumOfRVs(0, [w_theta])
         cos_theta = state.theta.cos_applied()
         sin_theta = state.theta.sin_applied()
 
         # Pre compute a bunch of relevant moments
         E_cos_theta_sin_theta = CrossSumOfRVs(cos_theta.c, cos_theta.random_variables).compute_moment(1)
-        E_cos_w_theta = cos_w_theta.compute_moment(1)
-        E_sin_w_theta = sin_w_theta.compute_moment(1)
+        E_cos_w_theta = CosSumOfRVs(0, [w_theta]).compute_moment(1)
+        E_sin_w_theta = SinSumOfRVs(0, [w_theta]).compute_moment(1)
         E2_cos_theta = cos_theta.compute_moment(2)
         E2_sin_theta = sin_theta.compute_moment(2)
         E_w_v = w_v.compute_moment(1)

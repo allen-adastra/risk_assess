@@ -121,12 +121,14 @@ def identify_needed_updates(derived_variable_to_check, base_variables, dependenc
     new_update_relations_needed = []
     variables_need_higher_moments = dict()
     for mono in derived_variable_to_check.update_relation.monoms():
+        # Iterating over monomials.
         for i, degree in enumerate(mono):
             # Check if we can compute moments of the random variable up to "degree"
             # If not, we will need to derive an update relation for the "degree-th"
             # moment of the ith base variable.
             if degree > base_variables.max_moments[i]:
                 variables_need_higher_moments[base_variables.variables[i]] = degree
+                
         # Find the graph of variable dependencies for this particular monomial.
         variables_in_mono = {base_variables.variables[i] for i, degree in enumerate(mono) if degree != 0}
         mono_dependence_graph = dependence_graph.subgraph(variables_in_mono)
@@ -181,7 +183,7 @@ def iterate_relations(derived_base_vars_to_check, base_variables, variable_depen
     for relation in derived_base_vars_to_check:
         new_update_relations_needed, variables_need_higher_moments = identify_needed_updates(relation, base_variables, variable_dependence_graph, derived_base_vars)
         need_update_relations += new_update_relations_needed
-
+    print(variables_need_higher_moments)
     if len(variables_need_higher_moments):
         raise Exception("There were variables that need higher moments, but we haven't figured out yet what to do when certain variables need higher moments.")
 

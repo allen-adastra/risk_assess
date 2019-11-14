@@ -36,6 +36,7 @@ class TestClass:
 
     def test_cross(self):
         self.setup()
+        # These were derived in the ICRA paper.
         derived_base_variables = [DerivedVariable([self._xt, self._sin_thetat], None),
                                   DerivedVariable([self._xt, self._cos_thetat], None),
                                   DerivedVariable([self._yt, self._sin_thetat], None),
@@ -82,7 +83,6 @@ class TestClass:
         assert {self._yt, self._vt, self._sin_thetat} in derived_base_variables_components
         assert {self._yt, self._vt, self._cos_thetat} in derived_base_variables_components
         assert len(derived_base_variables_components) == 9
-        
         for var in derived_base_variables:
             print("Update relation for " + str(var.component_variables_sympy))
             print(var.update_relation)
