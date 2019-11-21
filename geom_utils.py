@@ -1,6 +1,5 @@
 import math
 import numpy as np
-import matplotlib.pyplot as plt
 
 class HalfSpace(object):
     """
@@ -115,18 +114,6 @@ class Ellipse(object):
         lines = n_lines * [None]
         for i in range(n_lines):
             lines[i] = Line(a1 = -ms[i], a2 = 1, b = ms[i] * xys[0,i] - xys[1,i])
-        # TEST CODE:
-        if test:
-            xs_lines = [list(np.linspace(xys[0,i] - 2, xys[0,i] + 2, 100)) for i in range(n_lines)]
-            ys_lines = n_lines * [None]
-            for i in range(n_lines):
-                ys_lines[i] = lines[i].compute_ys_given_xs(xs_lines[i])
-            fig, ax = plt.subplots()
-            ax.scatter(xys[0, :], xys[1,:])
-            for xs, ys in zip(xs_lines, ys_lines):
-                ax.plot(xs, ys)
-            plt.axis('equal')
-            plt.show()
         return lines
 
     def generate_halfspaces_containing_ellipse(self, ts):

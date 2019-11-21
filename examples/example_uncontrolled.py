@@ -9,9 +9,6 @@ from models import *
 import time
 import cProfile, pstats, io
 from pstats import SortKey
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-from matplotlib.offsetbox import TextArea, DrawingArea, OffsetImage, AnnotationBbox
 from plan_verifier import PlanVerifier
 from geom_utils import Ellipse
 

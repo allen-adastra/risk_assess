@@ -9,9 +9,6 @@ from models import *
 import time
 import cProfile, pstats, io
 from pstats import SortKey
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-from matplotlib.offsetbox import TextArea, DrawingArea, OffsetImage, AnnotationBbox
 
 def percent_error(approx, exact):
     return 100 * (abs(approx - exact)/exact)

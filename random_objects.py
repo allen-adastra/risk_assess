@@ -4,7 +4,6 @@ import math
 import cmath
 from scipy.special import hyp1f1, comb
 from scipy.stats import norm
-import matplotlib.pyplot as plt
 
 class RandomVariable(object):
     def __init__(self):
@@ -32,13 +31,7 @@ class RandomVariable(object):
 
     def compute_variance(self):
         return self.compute_moment(2) - self.compute_moment(1)**2
-    
-    def plot_histogram(self, n_samples, bins = None):
-        samps = [self.sample() for i in range(n_samples)]
-        if bins == None:
-            bins = "auto"
-        plt.hist(samps, bins = bins)
-        plt.show()
+
 
 class RandomVector(object):
     def __init__(self, random_variables):
