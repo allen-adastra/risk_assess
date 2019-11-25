@@ -3,7 +3,7 @@ import numpy as np
 import math
 import cmath
 from scipy.special import hyp1f1, comb
-from scipy.stats import norm
+from scipy.stats import norm, ncx2, chi2
 
 class RandomVariable(object):
     def __init__(self):
