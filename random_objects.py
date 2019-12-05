@@ -154,14 +154,6 @@ class MultivariateNormal(object):
                                     [math.sin(-dtheta), math.cos(-dtheta)]])
         self._mean = np.matmul(rotation_matrix, self._mean)
         self._covariance = np.matmul(rotation_matrix, np.matmul(self._covariance, rotation_matrix.T))
-    
-    def translate(self, offset_vec):
-        """
-        Translate the MVN by the vector vec.
-        Args:
-            offset_vec (nx1 numpy array)
-        """
-        self._mean += offset_vec
 
     def change_frame(self, offset_vec, dtheta):
         """
@@ -170,7 +162,8 @@ class MultivariateNormal(object):
             offset_vec (nx1 numpy array): vector from origin of frame A to frame B
             dtheta (radians): angle from the x axis of frame A to frame B
         """
-        self.translate(offset_vec)
+        # By convention, we need to translate before rotating.
+        self._mean += -offset_vec
         self.rotate(dtheta)
 
 class Normal(RandomVariable):
