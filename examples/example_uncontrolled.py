@@ -7,8 +7,6 @@ import numpy as np
 from stochastic_verification_functions import StochasticVerificationFunction
 from models import *
 import time
-import cProfile, pstats, io
-from pstats import SortKey
 from plan_verifier import PlanVerifier
 from geom_utils import Ellipse
 
@@ -61,12 +59,4 @@ accels = n_t * [0.05]
 steers = n_t * [0.01]
 car_coord_ellipse = Ellipse(1, 3, 0, 0, 0)
 verifier = PlanVerifier(ego_initial_state, accels, steers, car_coord_ellipse)
-
-t_start = time.time()
-pr = cProfile.Profile()
-pr.enable()
 prob_bounds = verifier.check_uncertain_agent(agent, 10)
-pr.disable()
-sortby = 'cumtime'
-ps = pstats.Stats(pr).sort_stats(sortby)
-ps.print_stats()

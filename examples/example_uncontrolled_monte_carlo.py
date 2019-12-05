@@ -7,8 +7,6 @@ import numpy as np
 from stochastic_verification_functions import StochasticVerificationFunction
 from models import *
 import time
-import cProfile, pstats, io
-from pstats import SortKey
 
 def percent_error(approx, exact):
     return 100 * (abs(approx - exact)/exact)
@@ -70,10 +68,11 @@ left_component = MixtureComponent(Normal(0.3, 0.03), 0.25)
 right_component = MixtureComponent(Normal(-0.3, 0.03), 0.15)
 mm = MixtureModel([central_component, left_component, right_component])
 wthetas = RandomVector([mm for i in range(n_t)])
-
-car_model = UncontrolledCar(x0, y0, v0, theta0)
+uncontrolled_car_initial_state = UncontrolledCarState(x0, y0, v0, theta0)
+ego_car_initial_state = CarState(x0, y0, v0, theta0)
+car_model = UncontrolledCar(uncontrolled_car_initial_state)
 prop_moments = car_model.propagate_moments(wthetas, wvs)
-xs, ys = car_model.monte_carlo(x0, y0, v0, theta0, wthetas, wvs, int(1e5))
+xs, ys = car_model.monte_carlo(ego_car_initial_state, wthetas, wvs, int(1e5))
 sample_moments = compute_sample_moments(xs, ys)
 
 for sm, pm in zip(sample_moments, prop_moments):

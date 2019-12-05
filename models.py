@@ -85,7 +85,7 @@ class UncontrolledCar(object):
     def state(self):
         return copy(self._state)
 
-    def monte_carlo(self, x0, y0, v0, theta0, w_thetas, w_vs, n_samps):
+    def monte_carlo(self, initial_state, w_thetas, w_vs, n_samps):
         # w_thetas_samps and w_vs_samps are lists of lists of samples
         # across the full horizon.
         w_thetas_samps = [w_thetas.sample() for i in range(n_samps)]
@@ -97,7 +97,7 @@ class UncontrolledCar(object):
         ys = np.zeros((n_samps, n_t))
         # TODO: STORE DAS DATA!
         for i in range(n_samps):            
-            xs[i], ys[i], _, _ = self.simulate(x0, y0, v0, theta0, w_thetas_samps[i], w_vs_samps[i])
+            xs[i], ys[i], _, _ = simulate_deterministic(initial_state, w_thetas_samps[i], w_vs_samps[i])
         return xs, ys
 
     def monte_carlo_onestep(self, x0, y0, w_theta, w_v, n_samps):

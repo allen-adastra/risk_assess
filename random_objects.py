@@ -130,6 +130,24 @@ class MixtureModel(RandomVariable):
         mode_idx = list(np.random.multinomial(1, self.component_probabilities)).index(1)
         return self.component_random_variables[mode_idx].sample()
 
+class MultivariateNormal(object):
+    def __init__(self, mean, covariance):
+        """
+        Args:
+            mean (n x 1 numpy array): mean vector
+            covariance (n x n numpy array): covariance matrix
+        """
+        self._mean = mean
+        self._covariance = covariance
+
+    @property
+    def mean(self):
+        return self._mean
+    
+    @property
+    def covariance(self):
+        return self._covariance
+
 class Normal(RandomVariable):
     def __init__(self, mean, std):
         self._mean = mean
