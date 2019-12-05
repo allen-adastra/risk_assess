@@ -62,11 +62,7 @@ y0 = 0.0
 v0 = 1.0
 theta0 = 0.5
 wvs = RandomVector([Normal(1.0, 0.05) for i in range(n_t)])
-
-central_component = MixtureComponent(Normal(0.0, 0.001), 0.6)
-left_component = MixtureComponent(Normal(0.3, 0.03), 0.25)
-right_component = MixtureComponent(Normal(-0.3, 0.03), 0.15)
-mm = MixtureModel([central_component, left_component, right_component])
+mm = MixtureModel([(0.6, Normal(0.0, 0.001)), (0.25, Normal(0.3, 0.03)), (0.15, Normal(-0.3, 0.03))])
 wthetas = RandomVector([mm for i in range(n_t)])
 uncontrolled_car_initial_state = UncontrolledCarState(x0, y0, v0, theta0)
 ego_car_initial_state = CarState(x0, y0, v0, theta0)

@@ -86,7 +86,7 @@ class TestClass:
         for var in derived_base_variables:
             print("Update relation for " + str(var.component_variables_sympy))
             print(var.update_relation)
-
+            
     def test_derived_base_var(self):
         x = BaseVariable(sp.Symbol('x'), 1, None)
         y = BaseVariable(sp.Symbol('y'), 1, None)

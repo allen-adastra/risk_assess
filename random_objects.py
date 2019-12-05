@@ -87,18 +87,13 @@ class MarkovChain(object):
                 self.marginal_probabilities[i + 1] = np.matmul(self.T, self.marginal_probabilities[i])
         return self.marginal_probabilities[n_step]    
 
-class MixtureComponent(object):
-    def __init__(self, random_variable, weight):
-        self.rv = random_variable
-        self.weight = weight
-
 class MixtureModel(RandomVariable):
     def __init__(self, mixture_components):
         """
-        component_random_variables: list of instances of MixtureComponent
+        component_random_variables: list of tuples of the form (weight, RandomVariable)
         """
-        self.component_random_variables = [comp.rv for comp in mixture_components]
-        self.component_probabilities = [comp.weight for comp in mixture_components]
+        self.component_probabilities = [comp[0] for comp in mixture_components]
+        self.component_random_variables = [comp[1] for comp in mixture_components]
         sum_probs = sum(self.component_probabilities)
         if abs(sum_probs - 1) != 0:
             raise Exception("Input component probabilities must sum to 1, it sums to: " + str(sum_probs))
@@ -147,6 +142,36 @@ class MultivariateNormal(object):
     @property
     def covariance(self):
         return self._covariance
+
+    def rotate(self, dtheta):
+        """
+        Express the MVN in a new frame that is rotated counter clockwise clockwise by dtheta radians.
+        Args:
+            dtheta (radians):
+        """
+        # For counter clockwise rotations, need to multiply dtheta by -1.
+        rotation_matrix = np.array([[math.cos(-dtheta), -math.sin(-dtheta)],
+                                    [math.sin(-dtheta), math.cos(-dtheta)]])
+        self._mean = np.matmul(rotation_matrix, self._mean)
+        self._covariance = np.matmul(rotation_matrix, np.matmul(self._covariance, rotation_matrix.T))
+    
+    def translate(self, offset_vec):
+        """
+        Translate the MVN by the vector vec.
+        Args:
+            offset_vec (nx1 numpy array)
+        """
+        self._mean += offset_vec
+
+    def change_frame(self, offset_vec, dtheta):
+        """
+        Change from frame A to frame B.
+        Args:
+            offset_vec (nx1 numpy array): vector from origin of frame A to frame B
+            dtheta (radians): angle from the x axis of frame A to frame B
+        """
+        self.translate(offset_vec)
+        self.rotate(dtheta)
 
 class Normal(RandomVariable):
     def __init__(self, mean, std):

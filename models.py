@@ -79,7 +79,7 @@ class UncontrolledCar(object):
         Args:
             initial_state: instance of UncontrolledCarState
         """
-        self._state =initial_state
+        self._state = initial_state
 
     @property
     def state(self):

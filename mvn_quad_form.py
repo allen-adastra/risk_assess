@@ -120,6 +120,10 @@ class GmmQuadForm(object):
         self._mvn_components = [(prob, MvnQuadForm(A, mvn)) for prob, mvn in zip(gmm.component_probabilities, gmm.component_random_variables)]
     
     def upper_tail_probability(self, t):
+        """
+        Approximate the probability:
+            P(Q > t)
+        """
         upper_tail_prob = 0
         for component_prob, mvnqf in self._mvn_components:
             upper_tail_prob += component_prob * mvnqf.upper_tail_probability(t)
