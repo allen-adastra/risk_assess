@@ -64,14 +64,15 @@ class PlanVerifier(object):
             prob_bounds[i] = min([self.chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]])
         return prob_bounds
 
-    def assess_risk_gmms(self, gmms):
+    def assess_risk_gmms(self, gmm_traj):
         """
         Given a list of gaussian mixture models (GMMs) assess the risk of this plan
         Args:
-            gmms (list of instances of MixtureModel)
+            gmm_traj (instance of GmmTrajectory)
         Returns:
             list of risks associated to the GMMs.
         """
+        gmms = gmm_traj.gmms
         Q = np.zeros((2, 2))
         Q[0][0] = 1.0/(self.car_coord_ellipse.a**2)
         Q[1][1] = 1.0/(self.car_coord_ellipse.b**2)

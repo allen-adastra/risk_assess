@@ -87,16 +87,78 @@ class MarkovChain(object):
                 self.marginal_probabilities[i + 1] = np.matmul(self.T, self.marginal_probabilities[i])
         return self.marginal_probabilities[n_step]    
 
+"""
+A sequence of Gaussian Mixture Models (GMMs) that represent a predicted agent trajectory.
+"""
+class GmmTrajectory(object):
+    def __init__(self, gmms):
+        """
+        Args:
+            gmms (list of instance of MixtureModel): ordered list of Gaussian Mixture Models representing a predicted agent trajectory.
+        """
+        self._gmms = gmms
+        self._n_components = len(self._gmms[0].component_random_variables)
+        self._n_steps = len(self._gmms)
+        self._dimension = self._gmms[0].component_random_variables[0].dimension
+        self.check_consistency()
+        self.generate_array_rep()
+
+    def check_consistency(self):
+        # First check that the number of components for each GMM is the same.
+        components_per_gmm = [len(gmm.component_random_variables) for gmm in self._gmms]
+        assert len(set(components_per_gmm)) == 1
+
+        # Check that the weights of the components are consistent.
+        for i in range(self._n_components):
+            comp_weights = [gmm.component_probabilities[i] for gmm in self._gmms]
+            assert(len(set(comp_weights))) == 1
+
+    def generate_array_rep(self):
+        """
+        Generate lists of trajectories for mean and covariances
+        """
+        self._mean_trajectories = self._n_components * [None]
+        self._covariance_trajectories = self._n_components * [None]
+        self._weights = self._gmms[0].component_probabilities # We can use the weights of the first gmm as check_consistency() ensures they are all the same
+        for i in range(self._n_components):
+            # Generate the sequence of mean and covariances for the ith mode
+            means = np.zeros((self._n_steps, self._dimension))
+            covs = np.zeros((self._n_steps, self._dimension, self._dimension))
+            for j, gmm in enumerate(self._gmms):
+                # We are currently looking at the ith mode
+                rv = gmm.component_random_variables[i]
+                means[j, :] = rv.mean.T
+                covs[j] = rv.covariance
+            self._mean_trajectories[i] = means
+            self._covariance_trajectories[i] = covs
+
+    @property
+    def mean_trajectories(self):
+        return self._mean_trajectories
+    
+    @property
+    def covariance_trajectories(self):
+        return self._covariance_trajectories
+
+    @property
+    def weights(self):
+        return self._weights
+    
+    @property
+    def gmms(self):
+        return self._gmms
+
+
 class MixtureModel(RandomVariable):
-    def __init__(self, mixture_components):
+    def __init__(self, mixture_components, weight_tolerance = 1e-6):
         """
         component_random_variables: list of tuples of the form (weight, RandomVariable)
         """
         self.component_probabilities = [comp[0] for comp in mixture_components]
         self.component_random_variables = [comp[1] for comp in mixture_components]
         sum_probs = sum(self.component_probabilities)
-        if abs(sum_probs - 1) != 0:
-            raise Exception("Input component probabilities must sum to 1, it sums to: " + str(sum_probs))
+        if abs(sum_probs - 1) > weight_tolerance:
+            raise Exception("Input component probabilities must sum to within " + str(weight_tolerance) + " of 1, but it sums to: " + str(sum_probs))
         # Cached values.
         self._char_fun_values = {}
         self._moment_values = {}
@@ -142,6 +204,10 @@ class MultivariateNormal(object):
     @property
     def covariance(self):
         return self._covariance
+
+    @property
+    def dimension(self):
+        return self._mean.shape[0]
 
     def rotate(self, dtheta):
         """
