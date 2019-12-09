@@ -1,6 +1,11 @@
 import math
 import numpy as np
 
+def rotation_matrix(theta):
+    C = math.cos(theta)
+    S = math.sin(theta)
+    return np.array([[C, -S], [S, C]])
+
 class HalfSpace(object):
     """
     This half space:

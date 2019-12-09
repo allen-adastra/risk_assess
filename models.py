@@ -2,7 +2,7 @@ import sympy as sp
 from itertools import accumulate
 import numpy as np
 import math
-from random_objects import *
+from plan_verification.random_objects import *
 from copy import copy
 
 

@@ -1,9 +1,10 @@
-from geom_utils import Ellipse
-from models import simulate_deterministic, UncontrolledCar
+from plan_verification.geom_utils import Ellipse, rotation_matrix
+from plan_verification.models import simulate_deterministic, UncontrolledCar
 import numpy as np
 import math
 import time
-from mvn_quad_form import GmmQuadForm
+from plan_verification.mvn_quad_form import GmmQuadForm
+from copy import copy
 
 class PlanVerifier(object):
     def __init__(self, initial_state, accels, steers, car_coord_ellipse):
@@ -68,7 +69,7 @@ class PlanVerifier(object):
         """
         Given a list of gaussian mixture models (GMMs) assess the risk of this plan
         Args:
-            gmm_traj (instance of GmmTrajectory)
+            gmm_traj (instance of GmmTrajectory): gmm trajectory in the global frame
         Returns:
             list of risks associated to the GMMs.
         """
@@ -78,6 +79,11 @@ class PlanVerifier(object):
         Q[1][1] = 1.0/(self.car_coord_ellipse.b**2)
         risk_estimates = len(gmms) * [None]
         for i in range(len(gmms)):
-            gmm_quad_form = GmmQuadForm(Q, gmms[i])
-            risk_estimates[i] = gmm_quad_form.upper_tail_probability(1)
+            ego_vehicle_position = np.array([[self.xs[i]],
+                                             [self.ys[i]]])
+            rot_mat = rotation_matrix(self.thetas[i])
+            gmm = copy(gmms[i])
+            gmm.change_frame(ego_vehicle_position, rot_mat)
+            gmm_quad_form = GmmQuadForm(Q, gmm)
+            risk_estimates[i] = 1 - gmm_quad_form.upper_tail_probability(1)
         return risk_estimates

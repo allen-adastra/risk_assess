@@ -103,6 +103,9 @@ class GmmTrajectory(object):
         self.check_consistency()
         self.generate_array_rep()
     
+    def __len__(self):
+        return len(self._gmms)
+
     @property
     def array_rep(self):
         self.generate_array_rep()
@@ -131,11 +134,12 @@ class GmmTrajectory(object):
             for k in range(num_mixture):
                 # get covariance matrix in local frame
                 cov_k = np.array([[sigs[0,0]**2,0],[0,sigs[1,1]**2]])
-                mn = MultivariateNormal(mus[k]*scale_k, cov_k*scale_k)
+                mu = np.c_[mus[k]] # convert mus[k] which is a list into a column numpy array
+                mn = MultivariateNormal(mu*scale_k, cov_k*scale_k)
 
                 # Add to mixture_components
                 mixture_components[k] = (weights[k], mn)
-            gmms.append(MixtureModel(mixture_components))
+            gmms.append(GMM(mixture_components))
         gmm_traj = cls(gmms)
         return gmm_traj
 
@@ -177,8 +181,7 @@ class GmmTrajectory(object):
         """
         # Apply to each component of each GMM in the trajectory.
         for gmm in self._gmms:
-            for mvn in gmm.component_random_variables:
-                mvn.change_frame(offset_vec, rotation_matrix)
+            gmm.change_frame(offset_vec, rotation_matrix)
 
 class MixtureModel(RandomVariable):
     def __init__(self, mixture_components, weight_tolerance = 1e-6):
@@ -217,6 +220,21 @@ class MixtureModel(RandomVariable):
         # the variable chosen.
         mode_idx = list(np.random.multinomial(1, self.component_probabilities)).index(1)
         return self.component_random_variables[mode_idx].sample()
+
+class GMM(MixtureModel):
+    """
+    Multivariate Gaussian Mixture Model (GMM)
+    """
+
+    def change_frame(self, offset_vec, rotation_matrix):
+        """
+        Change from frame A to frame B.
+        Args:
+            offset_vec (nx1 numpy array): vector from origin of frame A to frame B
+            rotation_matrix (n x n numpy array): rotation matrix corresponding to the angle of the x axis of frame A to frame B
+        """
+        for mvn in self.component_random_variables:
+            mvn.change_frame(offset_vec, rotation_matrix)
 
 class MultivariateNormal(object):
     def __init__(self, mean, covariance):
