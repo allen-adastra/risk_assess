@@ -102,6 +102,42 @@ class GmmTrajectory(object):
         self._dimension = self._gmms[0].component_random_variables[0].dimension
         self.check_consistency()
         self.generate_array_rep()
+    
+    @property
+    def array_rep(self):
+        self.generate_array_rep()
+        return self._mean_trajectories, self._covariance_trajectories, self._weights
+    
+    @property
+    def gmms(self):
+        return self._gmms
+
+    @classmethod
+    def from_prediction(cls, prediction, scale_k):
+        """
+        Convert a predicted GMM trajectory into an instance of GmmTrajectory.
+        Args:
+            prediction: output from Pytorch deep net
+            scale_k: position down scaling factor
+        """
+        gmms = []
+        for pre in prediction:
+            weights = np.array(pre['lweights'][0].exp().tolist())
+            # transform mus and sigs to global frame
+            mus = np.array(pre['mus'][0].tolist())
+            sigs = np.array(pre['lsigs'][0].exp().tolist())
+            num_mixture = mus.shape[0]
+            mixture_components = num_mixture * [None] # List of tuples of the form (weight, MultivariateNormal)
+            for k in range(num_mixture):
+                # get covariance matrix in local frame
+                cov_k = np.array([[sigs[0,0]**2,0],[0,sigs[1,1]**2]])
+                mn = MultivariateNormal(mus[k]*scale_k, cov_k*scale_k)
+
+                # Add to mixture_components
+                mixture_components[k] = (weights[k], mn)
+            gmms.append(MixtureModel(mixture_components))
+        gmm_traj = cls(gmms)
+        return gmm_traj
 
     def check_consistency(self):
         # First check that the number of components for each GMM is the same.
@@ -131,23 +167,18 @@ class GmmTrajectory(object):
                 covs[j] = rv.covariance
             self._mean_trajectories[i] = means
             self._covariance_trajectories[i] = covs
-
-    @property
-    def mean_trajectories(self):
-        return self._mean_trajectories
     
-    @property
-    def covariance_trajectories(self):
-        return self._covariance_trajectories
-
-    @property
-    def weights(self):
-        return self._weights
-    
-    @property
-    def gmms(self):
-        return self._gmms
-
+    def change_frame(self, offset_vec, rotation_matrix):
+        """
+        Change from frame A to frame B.
+        Args:
+            offset_vec (nx1 numpy array): vector from origin of frame A to frame B
+            rotation_matrix (n x n numpy array): rotation matrix corresponding to the angle of the x axis of frame A to frame B
+        """
+        # Apply to each component of each GMM in the trajectory.
+        for gmm in self._gmms:
+            for mvn in gmm.component_random_variables:
+                mvn.change_frame(offset_vec, rotation_matrix)
 
 class MixtureModel(RandomVariable):
     def __init__(self, mixture_components, weight_tolerance = 1e-6):
@@ -209,28 +240,26 @@ class MultivariateNormal(object):
     def dimension(self):
         return self._mean.shape[0]
 
-    def rotate(self, dtheta):
+    def rotate(self, rotation_matrix):
         """
-        Express the MVN in a new frame that is rotated counter clockwise clockwise by dtheta radians.
+        Express the MVN in a new frame that is rotated by the rotation matrix
         Args:
-            dtheta (radians):
+            dtheta (rotation_matrix):
         """
         # For counter clockwise rotations, need to multiply dtheta by -1.
-        rotation_matrix = np.array([[math.cos(-dtheta), -math.sin(-dtheta)],
-                                    [math.sin(-dtheta), math.cos(-dtheta)]])
         self._mean = np.matmul(rotation_matrix, self._mean)
         self._covariance = np.matmul(rotation_matrix, np.matmul(self._covariance, rotation_matrix.T))
 
-    def change_frame(self, offset_vec, dtheta):
+    def change_frame(self, offset_vec, rotation_matrix):
         """
         Change from frame A to frame B.
         Args:
             offset_vec (nx1 numpy array): vector from origin of frame A to frame B
-            dtheta (radians): angle from the x axis of frame A to frame B
+            rotation_matrix (n x n numpy array): rotation matrix corresponding to the angle of the x axis of frame A to frame B
         """
         # By convention, we need to translate before rotating.
         self._mean += -offset_vec
-        self.rotate(dtheta)
+        self.rotate(rotation_matrix.T) # The inverse of a rotation matrix is equal to its transpose.
 
 class Normal(RandomVariable):
     def __init__(self, mean, std):

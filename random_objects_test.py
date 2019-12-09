@@ -18,15 +18,6 @@ class TestClass:
         gmmqf = GmmQuadForm(A, gmm)
         print(gmmqf.upper_tail_probability(1.0))
 
-    def test_mvn_frame_change(self):
-        mean_vec = np.array([[1.0], [0.0]])
-        cov = np.eye(2)
-        cov[0][1] = 0.1
-        cov[1][0] = 0.1
-        mvn = MultivariateNormal(mean_vec, cov)
-        dtheta = 0.5
-        mvn.change_frame(np.zeros((2, 1)), dtheta)
-
 if __name__ == "__main__":
     tc = TestClass()
     tc.test_mvn_frame_change()
