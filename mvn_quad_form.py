@@ -86,15 +86,9 @@ class MvnQuadForm(object):
         n_true = np.argwhere(res > t).size
         return float(n_true)/float(n_samples)
 
-    def upper_tail_probability(self, t):
+    def upper_tail_probability_noncentral_chisquare(self, t):
         """
-        Approximate the probability:
-            Prob(x'Ax > t)
-        Args:
-            A (numpy array): as defined
-            mu_x (numpy array): mean vector of x
-            Sigma (numpy array): covariance matrix of x
-            t (scalar): as defined
+        Approximate the upper tail probability using the noncentral chi square approximation.
         """
         tstar = (t - self._mu_Q)/self._sigma_Q
         tspecial = tstar * self._sigma_chi + self._mu_chi
@@ -103,6 +97,19 @@ class MvnQuadForm(object):
             return 1.0 - chi2.cdf(tspecial, self._dof, loc=0, scale=1)
         else:
             return 1.0 - ncx2.cdf(tspecial, self._dof , self._noncentrality)
+
+    def upper_tail_probability(self, t, method, **kwargs):
+        """
+        Compute the probability:
+            Prob(x'Ax > t)
+        """
+        if method == "monte_carlo":
+            return self.upper_tail_probability_monte_carlo(t, kwargs['n_samples'])
+        elif method == "noncentral_chisquare":
+            return self.upper_tail_probability_noncentral_chisquare(t)
+        else:
+            raise NotImplementedError("Invalid method name.")
+        
 
 class GmmQuadForm(object):
     """
@@ -119,14 +126,14 @@ class GmmQuadForm(object):
         """
         self._mvn_components = [(prob, MvnQuadForm(A, mvn)) for prob, mvn in zip(gmm.component_probabilities, gmm.component_random_variables)]
     
-    def upper_tail_probability(self, t, overshoot_one_tolerance = 1e-6):
+    def upper_tail_probability(self, t, method,  overshoot_one_tolerance = 1e-6, **kwargs):
         """
         Approximate the probability:
             P(Q > t)
         """
         upper_tail_prob = 0
         for component_prob, mvnqf in self._mvn_components:
-            upper_tail_prob += component_prob * mvnqf.upper_tail_probability(t)
+            upper_tail_prob += component_prob * mvnqf.upper_tail_probability(t, method, **kwargs)
         # The calculated probability will have an associated numerical error. Check
         # that the numerical error does not exceed the tolerable amount.
         assert upper_tail_prob < 1.0 + overshoot_one_tolerance

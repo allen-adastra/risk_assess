@@ -4,7 +4,7 @@ import numpy as np
 import math
 import time
 from plan_verification.mvn_quad_form import GmmQuadForm
-from copy import copy
+from copy import copy, deepcopy
 
 class PlanVerifier(object):
     def __init__(self, initial_state, accels, steers, car_coord_ellipse):
@@ -65,11 +65,12 @@ class PlanVerifier(object):
             prob_bounds[i] = min([self.chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]])
         return prob_bounds
 
-    def assess_risk_gmms(self, gmm_traj):
+    def assess_risk_gmms(self, gmm_traj, method, **kwargs):
         """
         Given a list of gaussian mixture models (GMMs) assess the risk of this plan
         Args:
             gmm_traj (instance of GmmTrajectory): gmm trajectory in the global frame
+            method (string): method used to assess risk
         Returns:
             list of risks associated to the GMMs.
         """
@@ -82,8 +83,8 @@ class PlanVerifier(object):
             ego_vehicle_position = np.array([[self.xs[i]],
                                              [self.ys[i]]])
             rot_mat = rotation_matrix(self.thetas[i])
-            gmm = copy(gmms[i])
+            gmm = deepcopy(gmms[i])
             gmm.change_frame(ego_vehicle_position, rot_mat)
             gmm_quad_form = GmmQuadForm(Q, gmm)
-            risk_estimates[i] = 1 - gmm_quad_form.upper_tail_probability(1)
+            risk_estimates[i] = 1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) # Ellipse is defined s.t. x'Qx <= 1, so input "1"
         return risk_estimates
