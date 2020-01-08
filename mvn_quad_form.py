@@ -1,5 +1,8 @@
 import numpy as np
 from scipy.stats import ncx2, chi2
+import rpy2.robjects as ro
+from rpy2.robjects.packages import importr
+stats = importr('stats')
 
 def compute_ck(A, Sigma, mu_x, k_max):
     """
@@ -89,6 +92,7 @@ class MvnQuadForm(object):
     def upper_tail_probability_noncentral_chisquare(self, t):
         """
         Approximate the upper tail probability using the noncentral chi square approximation.
+        Use the scipy implementation of ncx2.
         """
         tstar = (t - self._mu_Q)/self._sigma_Q
         tspecial = tstar * self._sigma_chi + self._mu_chi
@@ -97,6 +101,15 @@ class MvnQuadForm(object):
             return 1.0 - chi2.cdf(tspecial, self._dof, loc=0, scale=1)
         else:
             return 1.0 - ncx2.cdf(tspecial, self._dof , self._noncentrality)
+
+    def upper_tail_probability_noncentral_chisquare_R(self, t):
+        """
+        Approximate the upper tail probability using the noncentral chi square approximation.
+        Use the R implementation of ncx2.
+        """
+        tstar = (t - self._mu_Q)/self._sigma_Q
+        tspecial = tstar * self._sigma_chi + self._mu_chi
+        return 1.0 - stats.pchisq(tspecial, self._dof , self._noncentrality)[0]        
 
     def upper_tail_probability(self, t, method, **kwargs):
         """
@@ -107,6 +120,8 @@ class MvnQuadForm(object):
             return self.upper_tail_probability_monte_carlo(t, kwargs['n_samples'])
         elif method == "noncentral_chisquare":
             return self.upper_tail_probability_noncentral_chisquare(t)
+        elif method == "noncentral_chisquare_R":
+            return self.upper_tail_probability_noncentral_chisquare_R(t)
         else:
             raise NotImplementedError("Invalid method name.")
         

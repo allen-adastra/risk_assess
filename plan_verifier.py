@@ -65,6 +65,21 @@ class PlanVerifier(object):
             prob_bounds[i] = min([self.chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]])
         return prob_bounds
 
+    def prepare_gmm_quad_forms(self, gmm_traj, method):
+        gmms = gmm_traj.gmms
+        Q = np.zeros((2, 2))
+        Q[0][0] = 1.0/(self.car_coord_ellipse.a**2)
+        Q[1][1] = 1.0/(self.car_coord_ellipse.b**2)
+        gmm_quad_forms = len(gmms) * [None]
+        for i in range(len(gmms)):
+            ego_vehicle_position = np.array([[self.xs[i]],
+                                             [self.ys[i]]])
+            rot_mat = rotation_matrix(self.thetas[i])
+            gmm = deepcopy(gmms[i])
+            gmm.change_frame(ego_vehicle_position, rot_mat)
+            gmm_quad_forms[i] = GmmQuadForm(Q, gmm)
+        return gmm_quad_forms
+
     def assess_risk_gmms(self, gmm_traj, method, **kwargs):
         """
         Given a list of gaussian mixture models (GMMs) assess the risk of this plan
@@ -74,17 +89,10 @@ class PlanVerifier(object):
         Returns:
             list of risks associated to the GMMs.
         """
-        gmms = gmm_traj.gmms
-        Q = np.zeros((2, 2))
-        Q[0][0] = 1.0/(self.car_coord_ellipse.a**2)
-        Q[1][1] = 1.0/(self.car_coord_ellipse.b**2)
-        risk_estimates = len(gmms) * [None]
-        for i in range(len(gmms)):
-            ego_vehicle_position = np.array([[self.xs[i]],
-                                             [self.ys[i]]])
-            rot_mat = rotation_matrix(self.thetas[i])
-            gmm = deepcopy(gmms[i])
-            gmm.change_frame(ego_vehicle_position, rot_mat)
-            gmm_quad_form = GmmQuadForm(Q, gmm)
-            risk_estimates[i] = 1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) # Ellipse is defined s.t. x'Qx <= 1, so input "1"
-        return risk_estimates
+        tstart_prep = time.time()
+        gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj, method)
+        t_prep = time.time() - tstart_prep
+        tstart_risk_estimate = time.time()
+        risk_estimates = [1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) for gmm_quad_form in gmm_quad_forms]
+        t_risk_assess = time.time() - tstart_risk_estimate
+        return risk_estimates, t_prep, t_risk_assess
