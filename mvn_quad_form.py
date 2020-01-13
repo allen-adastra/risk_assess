@@ -132,7 +132,10 @@ class MvnQuadForm(object):
         lambdas, deltas = compute_lambdas_deltas(self._mu_x, self._Sigma_x, self._A)
         out = cqf.imhof(t, ro.FloatVector(list(lambdas)), delta = ro.FloatVector(list(deltas)), epsabs = eps_abs, epsrel = eps_rel)
         out = dict(zip(out.names, list(out)))
+        if out['abserr'][0] > 2 * eps_abs:
+            print("Warning! The absolute error is %.3E which is more than double the absolute error tolerance" % out['abserr'][0])
         return out['Qq'][0]
+
 
     def upper_tail_probability(self, t, method, **kwargs):
         """
