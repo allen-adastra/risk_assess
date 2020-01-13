@@ -1,30 +1,36 @@
 import numpy as np
 from scipy.stats import ncx2, chi2
+import scipy.linalg as sla
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 stats = importr('stats')
+cqf = importr('CompQuadForm')
 
-def compute_ck(A, Sigma, mu_x, k_max):
+def compute_lambdas_deltas(mux, Sigmax, Q, diagonalization_error_tolerance = 1e-10):
     """
-    Compute the coefficients "ck" as defined
-    Args:
-        A:
-        Sigma:
-        mu_x:
+    Compute the lambdas and deltas (non-centrality parameters) as described in Duchesne and De Micheaux.
+    These lambdas and deltas correspond to those found in Liu et al as well.
     """
-    # ASigma is A * Sigma
-    ASigma = np.matmul(A, Sigma)
-    ck = dict()
-    # Cache the matrix powers of ASigma in this dictionary
-    # Where the key k corresponds to (A * Sigma)^k
-    ASigma_powers = dict()
-    ASigma_powers[0] = np.eye(ASigma.shape[0]) # The zeroth power of a matrix is the identity.
-    for k in range(1, k_max + 1):
-        ASigma_powers[k] = np.matmul(ASigma, ASigma_powers[k-1])
-        Amu_x = np.matmul(A, mu_x)
-        temp = np.matmul(ASigma_powers[k-1], Amu_x)
-        ck[k] = np.trace(ASigma_powers[k]) + k * (np.matmul(mu_x.T, temp))[0][0]
-    return ck
+    C = np.linalg.cholesky(Sigmax)
+    C = C.T
+    CQC = C @ Q @ C.T
+    eigvals, P = np.linalg.eig(CQC)
+    P = P.T
+    Lambda = P @ CQC @ P.T
+    lambdas = np.diag(Lambda)
+    muy = P @ np.linalg.inv(C.T) @ mux
+    deltas = np.square(muy)
+    return lambdas, deltas
+
+def compute_cks(lambdas, deltas):
+    """
+    Compute the coefficients "ck" as defined in Liu et al.
+    """
+    cs = dict()
+    for k in range(1, 5):
+        lambda_power = np.power(lambdas, k)
+        cs[k] = (sum(lambda_power) + k * np.dot(lambda_power, deltas))[0]
+    return cs
 
 def compute_dof_noncentrality(s1, s2):
     """
@@ -42,6 +48,25 @@ def compute_dof_noncentrality(s1, s2):
         dof = 1/s1**2
         assert dof > 0
     return acoeff, noncentrality, dof
+
+def compute_ncx2_params(t, mu_x, Sigma_x, A):
+    lambdas, deltas = compute_lambdas_deltas(mu_x, Sigma_x, A)
+    cks = compute_cks(lambdas, deltas)
+
+    # s1 and s2 as defined in Liu et al.
+    s1 = cks[3]/(cks[2]**1.5)
+    s2 = cks[4]/(cks[2]**2.0)
+    acoeff, noncentrality, dof = compute_dof_noncentrality(s1, s2)
+
+    # The mean of Q, mu_Q, is c1
+    # The standard deviation of Q, sigma_Q, is sqrt(2 * c2)
+    mu_Q = cks[1]
+    sigma_Q = (2 * cks[2])**0.5
+    mu_chi = dof + noncentrality
+    sigma_chi = acoeff * (2**0.5)
+    tstar = (t - mu_Q)/sigma_Q
+    tspecial = tstar * sigma_chi + mu_chi
+    return tspecial, dof, noncentrality
 
 """
 This random variable is defined by the following quadratic form:
@@ -62,23 +87,6 @@ class MvnQuadForm(object):
         self._mu_x = mvn.mean
         self._Sigma_x = mvn.covariance
 
-        cks = compute_ck(A, mvn.covariance, mvn.mean, 4)
-
-        # s1 and s2 as defined in the paper
-        s1 = cks[3]/(cks[2]**1.5)
-        s2 = cks[4]/(cks[2]**2.0)
-        acoeff, self._noncentrality, self._dof = compute_dof_noncentrality(s1, s2)
-
-        # The mean of Q, mu_Q, is c1
-        # The standard deviation of Q, sigma_Q, is sqrt(2 * c2)
-        self._mu_Q = cks[1]
-        self._sigma_Q = (2 * cks[2])**0.5
-        self._mu_chi = self._dof + self._noncentrality
-        self._sigma_chi = acoeff * (2**0.5)
-
-        # We only need ck up to k = 4 for our approximation.
-        self._cks = compute_ck(A, mvn.covariance, mvn.mean, 4)
-
     def upper_tail_probability_monte_carlo(self, t, n_samples = 1e5):
         A = self._A
         mu_x = self._mu_x
@@ -94,22 +102,37 @@ class MvnQuadForm(object):
         Approximate the upper tail probability using the noncentral chi square approximation.
         Use the scipy implementation of ncx2.
         """
-        tstar = (t - self._mu_Q)/self._sigma_Q
-        tspecial = tstar * self._sigma_chi + self._mu_chi
-        if self._noncentrality == 0.0:
+        tspecial, dof, noncentrality = compute_ncx2_params(t, self._mu_x, self._Sigma_x, self._A)
+        if noncentrality == 0.0:
             # If non-centrality is zero, we can just use the standard chi2 distribution.
-            return 1.0 - chi2.cdf(tspecial, self._dof, loc=0, scale=1)
+            return 1.0 - chi2.cdf(tspecial, dof, loc=0, scale=1)
         else:
-            return 1.0 - ncx2.cdf(tspecial, self._dof , self._noncentrality)
+            return 1.0 - ncx2.cdf(tspecial, dof , noncentrality)
 
     def upper_tail_probability_noncentral_chisquare_R(self, t):
         """
         Approximate the upper tail probability using the noncentral chi square approximation.
         Use the R implementation of ncx2.
         """
-        tstar = (t - self._mu_Q)/self._sigma_Q
-        tspecial = tstar * self._sigma_chi + self._mu_chi
-        return 1.0 - stats.pchisq(tspecial, self._dof , self._noncentrality)[0]        
+        tspecial, dof, noncentrality = compute_ncx2_params(t, self._mu_x, self._Sigma_x, self._A)
+        return 1.0 - stats.pchisq(tspecial, dof , noncentrality)[0]
+    
+    def upper_tail_probability_noncentral_chisquare_cqf(self, t):
+        """
+        Approximate the upper tail probability using the noncentral chi square approximation.
+        This directly uses the implementation in the CompQuadForm package in R.
+        """
+        lambdas, deltas = compute_lambdas_deltas(self._mu_x, self._Sigma_x, self._A)
+        return cqf.liu(t, ro.FloatVector(list(lambdas)), delta = ro.FloatVector(list(deltas)))[0]
+
+    def upper_tail_probability_imhof(self, t, eps_abs, eps_rel):
+        """
+        Use the method of imhof which has guaranteed bounds on error.
+        """
+        lambdas, deltas = compute_lambdas_deltas(self._mu_x, self._Sigma_x, self._A)
+        out = cqf.imhof(t, ro.FloatVector(list(lambdas)), delta = ro.FloatVector(list(deltas)), epsabs = eps_abs, epsrel = eps_rel)
+        out = dict(zip(out.names, list(out)))
+        return out['Qq'][0]
 
     def upper_tail_probability(self, t, method, **kwargs):
         """
@@ -122,6 +145,10 @@ class MvnQuadForm(object):
             return self.upper_tail_probability_noncentral_chisquare(t)
         elif method == "noncentral_chisquare_R":
             return self.upper_tail_probability_noncentral_chisquare_R(t)
+        elif method == "noncentral_chisquare_cqf":
+            return self.upper_tail_probability_noncentral_chisquare_cqf(t)
+        elif method == "imhof":
+            return self.upper_tail_probability_imhof(t, kwargs['eps_abs'], kwargs['eps_rel'])
         else:
             raise NotImplementedError("Invalid method name.")
         
@@ -147,8 +174,9 @@ class GmmQuadForm(object):
             P(Q > t)
         """
         upper_tail_prob = 0
-        for component_prob, mvnqf in self._mvn_components:
-            upper_tail_prob += component_prob * mvnqf.upper_tail_probability(t, method, **kwargs)
+        for component_weight, mvnqf in self._mvn_components:
+            mvnqf_prob = mvnqf.upper_tail_probability(t, method, **kwargs)
+            upper_tail_prob += component_weight * mvnqf_prob
         # The calculated probability will have an associated numerical error. Check
         # that the numerical error does not exceed the tolerable amount.
         assert upper_tail_prob < 1.0 + overshoot_one_tolerance
