@@ -97,6 +97,7 @@ class GmmControlSequence(object):
         self._n_components = len(self._gmms[0].component_random_variables)
         self.check_consistency()
         self._weights = self._gmms[0].component_probabilities # If consistent, all the GMMs will have same component probs
+        self.generate_rv_array_rep()
 
     @classmethod
     def from_prediction(cls, prediction):
@@ -127,7 +128,22 @@ class GmmControlSequence(object):
             gmms.append(GMM(mixture_components))
         gmm_control_seq = cls(gmms)
         return gmm_control_seq
-    
+
+    def generate_rv_array_rep(self):
+        """
+        Instead of a list of GMMs, we have two arrays of instance of the class Normal.
+        Each row of an array corresponds to the mode.
+        """
+        # Preallocate memory
+        accel_rvs = [len(self._gmms) * [None] for i in range(self._n_components)]
+        steer_rvs = [len(self._gmms) * [None] for i in range(self._n_components)]
+        for i in range(self._n_components):
+            for j in range(len(self._gmms)):
+                mvn = self._gmms[j].component_random_variables[i]
+                accel_rvs[i][j] = Normal(mvn.mean[0][0], mvn.covariance[0][0])
+                steer_rvs[i][j] = Normal(mvn.mean[1][0], mvn.covariance[1][1])
+        self._array_rv_rep = {"accels" : accel_rvs, "steers" : steer_rvs, "weights" : self._weights}
+
     def check_consistency(self):
         # First check that the number of components for each GMM is the same.
         components_per_gmm = [len(gmm.component_random_variables) for gmm in self._gmms]

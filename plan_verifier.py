@@ -1,5 +1,5 @@
 from plan_verification.geom_utils import Ellipse, rotation_matrix
-from plan_verification.models import simulate_deterministic, UncontrolledCar
+from plan_verification.models import simulate_deterministic
 import numpy as np
 import math
 import time
@@ -16,7 +16,11 @@ class PlanVerifier(object):
             car_coord_ellipse: instance of Ellipse defining an ellipse in the cars coordinates. x_center, y_center, and theta should be zero.
         """
         # Simulate to get self.xs, self.ys, self.thetas
-        self.xs, self.ys, self.vs, self.thetas = simulate_deterministic(initial_state.x, initial_state.y, initial_state.v, initial_state.theta, steers, accels)
+        xs, ys, vs, thetas = simulate_deterministic(initial_state.x, initial_state.y, initial_state.v, initial_state.theta, steers, accels)
+        self.xs = xs.tolist()[0]
+        self.ys = ys.tolist()[0]
+        self.vs = vs.tolist()[0]
+        self.thetas = thetas.tolist()[0]
         self.car_coord_ellipse = car_coord_ellipse
 
     def generate_ellipses(self, car_coord_ellipse):
