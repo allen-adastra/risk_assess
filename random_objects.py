@@ -231,11 +231,13 @@ class GmmTrajectory(object):
             # transform mus and sigs to global frame
             mus = np.array(pre['mus'][0].tolist())
             sigs = np.array(pre['lsigs'][0].exp().tolist())
+
+            # TODO: The matrix cov rows correspond to components and ultimately x and y are uncorrelated
             num_mixture = mus.shape[0]
             mixture_components = num_mixture * [None] # List of tuples of the form (weight, MultivariateNormal)
             for k in range(num_mixture):
                 # get covariance matrix in local frame
-                cov_k = np.array([[sigs[0,0]**2,0],[0,sigs[1,1]**2]])
+                cov_k = np.array([[sigs[k,0]**2,0],[0,sigs[k,1]**2]])
                 mu = np.c_[mus[k]] # convert mus[k] which is a list into a column numpy array
                 mn = MultivariateNormal(mu*scale_k, cov_k*scale_k)
 
