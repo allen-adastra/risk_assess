@@ -6,25 +6,25 @@ from plan_verification.random_objects import *
 from copy import copy
 
 
-def simulate_deterministic(initial_state, steers, accels):
+def simulate_deterministic(x0, y0, v0, theta0, steers, accels):
     """
     Given an initial state and control inputs for a horizon, simulate the deterministic model.
     Args:
-        initial_state: instance of CarState
+        x0, y0, v0, theta0: initial x, y positions, speed, and heading
         steers: control sequence
         accels: control sequence
     """
     # Construct lists of theta and v across the full time horizon
     # theta_t is just the sum theta_0 + theta_1 + ... + theta_{t-1}
-    thetas = list(accumulate([initial_state.theta] + steers))
+    thetas = list(accumulate([theta0] + steers))
     cos_thetas = np.cos(thetas)
     sin_thetas = np.sin(thetas)
-    vs = list(accumulate([initial_state.v] + accels))
+    vs = list(accumulate([v0] + accels))
     n_step = len(accels) + 1
     xs = n_step * [None]
     ys = n_step * [None]
-    xs[0] = initial_state.x
-    ys[0] = initial_state.y
+    xs[0] = x0
+    ys[0] = y0
     for i in range(1, n_step):
         xs[i] = xs[i-1] + vs[i-1] * cos_thetas[i-1]
         ys[i] = ys[i-1] + vs[i-1] * sin_thetas[i-1]
@@ -97,7 +97,7 @@ class UncontrolledCar(object):
         ys = np.zeros((n_samps, n_t))
         # TODO: STORE DAS DATA!
         for i in range(n_samps):            
-            xs[i], ys[i], _, _ = simulate_deterministic(initial_state, w_thetas_samps[i], w_vs_samps[i])
+            xs[i], ys[i], _, _ = simulate_deterministic(initial_state.x, initial_state.y, initial_state.v, initial_state.theta, w_thetas_samps[i], w_vs_samps[i])
         return xs, ys
 
     def monte_carlo_onestep(self, x0, y0, w_theta, w_v, n_samps):

@@ -16,7 +16,7 @@ class PlanVerifier(object):
             car_coord_ellipse: instance of Ellipse defining an ellipse in the cars coordinates. x_center, y_center, and theta should be zero.
         """
         # Simulate to get self.xs, self.ys, self.thetas
-        self.xs, self.ys, self.vs, self.thetas = simulate_deterministic(initial_state, steers, accels)
+        self.xs, self.ys, self.vs, self.thetas = simulate_deterministic(initial_state.x, initial_state.y, initial_state.v, initial_state.theta, steers, accels)
         self.car_coord_ellipse = car_coord_ellipse
 
     def generate_ellipses(self, car_coord_ellipse):
