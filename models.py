@@ -6,15 +6,17 @@ from plan_verification.random_objects import *
 from copy import copy, deepcopy
 
 
-def simulate_deterministic(x0, y0, v0, theta0, steers, accels):
+def simulate_deterministic(x0, y0, v0, theta0, accels, steers, dt):
     """
+    Given an initial state and control sequences, forward simulate and return future states.
     Args:
         x0 (scalar)
         y0 (scalar)
         v0 (scalar)
         theta0 (scalar)
-        steers (n_samps * n_step numpy array)
         accels (n_samps * n_step numpy array)
+        steers (n_samps * n_step numpy array)
+        dt (scalar)
     """
     assert (steers.shape == accels.shape)
     if len(steers.shape) == 1 and len(accels.shape) == 1:
@@ -29,19 +31,20 @@ def simulate_deterministic(x0, y0, v0, theta0, steers, accels):
     theta0_rep = np.repeat(theta0, n_samps).reshape(n_samps, 1)
 
     # Compute headings and speeds
-    thetas = np.cumsum(np.hstack((theta0_rep, steers)), axis = 1) # Sum along the rows to get headings
-    vs = np.cumsum(np.hstack((v0_rep, accels)), axis = 1) # Sum along the rows to get speeds
+    thetas = np.cumsum(np.hstack((theta0_rep, dt * steers)), axis = 1) # Sum along the rows to get headings
+    vs = np.cumsum(np.hstack((v0_rep, dt * accels)), axis = 1) # Sum along the rows to get speeds
+    dt_vs = dt * vs
 
-    # Arrive at v_t * cos(theta_t) and v_t * sin(theta_t) for every time step for every sample
+    # Arrive at dt * v_t * cos(theta_t) and dt * v_t * sin(theta_t) for every time step for every sample
     cos_thetas = np.cos(thetas)
     sin_thetas = np.sin(thetas)
-    vs_cos_thetas = np.multiply(vs, cos_thetas)
-    vs_sin_thetas = np.multiply(vs, sin_thetas)
+
+    dt_vs_cos_thetas = np.multiply(dt_vs, cos_thetas)
+    dt_vs_sin_thetas = np.multiply(dt_vs, sin_thetas)
 
     # x and y positions are just the cumulative sums of the v * cos(theta) and v * sin(theta) over time
-    xs = np.cumsum(np.hstack((x0_rep, vs_cos_thetas)), axis = 1)
-    ys = np.cumsum(np.hstack((y0_rep, vs_sin_thetas)), axis = 1)
-
+    xs = np.cumsum(np.hstack((x0_rep, dt_vs_cos_thetas)), axis = 1)
+    ys = np.cumsum(np.hstack((y0_rep, dt_vs_sin_thetas)), axis = 1)
     return xs, ys, vs, thetas
 
 def propagate_one_step(state, w_theta, w_v):

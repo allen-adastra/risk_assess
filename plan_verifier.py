@@ -1,4 +1,4 @@
-from plan_verification.geom_utils import Ellipse, rotation_matrix
+from plan_verification.geom_utils import Ellipse, rotation_matrix, change_frame
 from plan_verification.models import simulate_deterministic
 import numpy as np
 import math
@@ -7,7 +7,7 @@ from plan_verification.mvn_quad_form import GmmQuadForm
 from copy import copy, deepcopy
 
 class PlanVerifier(object):
-    def __init__(self, initial_state, accels, steers, car_coord_ellipse):
+    def __init__(self, xs, ys, vs, thetas, car_coord_ellipse):
         """
         Args:
             initial_state: instance of CarState
@@ -15,12 +15,10 @@ class PlanVerifier(object):
             steers: deterministic control sequence for the ego vehicle
             car_coord_ellipse: instance of Ellipse defining an ellipse in the cars coordinates. x_center, y_center, and theta should be zero.
         """
-        # Simulate to get self.xs, self.ys, self.thetas
-        xs, ys, vs, thetas = simulate_deterministic(initial_state.x, initial_state.y, initial_state.v, initial_state.theta, steers, accels)
-        self.xs = xs.tolist()[0]
-        self.ys = ys.tolist()[0]
-        self.vs = vs.tolist()[0]
-        self.thetas = thetas.tolist()[0]
+        self.xs = xs
+        self.ys = ys
+        self.vs = vs
+        self.thetas = thetas
         self.car_coord_ellipse = car_coord_ellipse
 
     def generate_ellipses(self, car_coord_ellipse):
@@ -49,7 +47,43 @@ class PlanVerifier(object):
         E2_z = l.a1**2 * moments.E2_x + 2 * l.a1 * l.a2 * moments.E_xy + 2 * l.a1 * l.b * moments.E_x + l.a2**2 * moments.E2_y\
               + 2 * l.a2 * l.b * moments.E_y + l.b**2
         return (E2_z - E_z**2)/E2_z
-        
+    
+    def assess_risk_monte_carlo(self, gmm_control_sequence, x0, y0, v0, theta0, n_samples, dt):
+        """
+        Args:
+            gmm_control_sequence (instance of GmmControlSequence)
+            x0 (scalar): initial x position of the agent
+            y0 (scalar): initial y position of the agent
+        """
+        # Sample control sequences and propagate them into states.
+        accel_samps, steer_samps = gmm_control_sequence.sample(n_samples)
+        agent_xs, agent_ys, agent_vs, thetas = simulate_deterministic(x0, y0, v0, theta0, accel_samps, steer_samps, dt)
+        # Propagating controls introduces "extra steps". Limit ourselves to this number of steps.
+        n_steps = len(self.xs) - 2
+
+        # Ellipse parameters in car coordinates.
+        Q = np.zeros((2, 2))
+        Q[0][0] = 1.0/(self.car_coord_ellipse.a**2)
+        Q[1][1] = 1.0/(self.car_coord_ellipse.b**2)
+
+        # Risks at each time step.
+        risks = n_steps * [None]
+
+        # We will have to transform the position samples into the car coordinates at each time step.
+        for i in range(n_steps):
+            ego_vehicle_position = np.array([[self.xs[i]],
+                                             [self.ys[i]]])
+            rot_mat = rotation_matrix(self.thetas[i])
+
+            # Each column is a sample [x; y]
+            agent_xys = np.vstack((agent_xs[:, i], agent_ys[:, i]))
+            change_frame_func = lambda vec : change_frame(vec, ego_vehicle_position, rot_mat)
+            np.apply_along_axis(change_frame_func, 0, agent_xys) # Change the frame of each column
+            # Evaluate the number of samples for which x'Qx <= 1 (i.e: collides with ellipse)
+            res = (agent_xys.T.dot(Q)*agent_xys.T).sum(axis=1)
+            n_collision = np.argwhere(res <= 1.0).size
+            risks[i] = float(n_collision)/float(n_samples)
+        return risks, agent_xs, agent_ys
 
     def assess_risk_moments(self, moments, n_lines):
         """
@@ -69,7 +103,7 @@ class PlanVerifier(object):
             prob_bounds[i] = min([self.chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]])
         return prob_bounds
 
-    def prepare_gmm_quad_forms(self, gmm_traj, method):
+    def prepare_gmm_quad_forms(self, gmm_traj):
         gmms = gmm_traj.gmms
         Q = np.zeros((2, 2))
         Q[0][0] = 1.0/(self.car_coord_ellipse.a**2)
@@ -94,7 +128,7 @@ class PlanVerifier(object):
             list of risks associated to the GMMs.
         """
         tstart_prep = time.time()
-        gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj, method)
+        gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj)
         t_prep = time.time() - tstart_prep
         tstart_risk_estimate = time.time()
         risk_estimates = [1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) for gmm_quad_form in gmm_quad_forms]

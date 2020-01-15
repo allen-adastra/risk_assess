@@ -164,7 +164,7 @@ class GmmControlSequence(object):
             steer_samps (n_samples x sequence length numpy array): Each row is a sample control sequence
         """
         # Determine the number of samples from each mode
-        mode_idx = [list(foo).index(1) for foo in np.random.multinomial(1, self._weights, size = 10)]
+        mode_idx = [list(foo).index(1) for foo in np.random.multinomial(1, self._weights, size = n_samples)]
         n_samps_per_mode = [mode_idx.count(i) for i in range(self._n_components)]
 
         # Arrays to hold samples from separate modes
