@@ -34,17 +34,23 @@ class TestThing(object):
                                                         (self._yt, self._cos_thetat)])
 
         # These were derived in the ICRA paper.
-        derived_variables = {DerivedVariable({self._xt : 1, self._sin_thetat : 1}, None),
+        self._derived_variables = {DerivedVariable({self._xt : 1, self._sin_thetat : 1}, None),
                                     DerivedVariable({self._xt : 1, self._cos_thetat : 1}, None),
                                     DerivedVariable({self._yt : 1, self._sin_thetat : 1}, None),
                                     DerivedVariable({self._yt : 1, self._cos_thetat : 1}, None)}
-        
-
 
     def test1(self):
         test_update = sp.poly(self._xt.update_relation**4, [var.sympy_rep for var in self._base_variables])
-        res = test_iterate(test_update, self._base_variables, self._variable_dependence_graph, derived_variables)
-    
+        res = test_iterate(test_update, self._base_variables, self._variable_dependence_graph, self._derived_variables)
+        test_update = sp.poly(self._xt.update_relation**2 * self._yt.update_relation**2, [var.sympy_rep for var in self._base_variables])
+        res = test_iterate(test_update, self._base_variables, self._variable_dependence_graph, self._derived_variables)
+
+    def test_all(self):
+        integer_pairs = [(2, 0), (1,1), (0, 2), (4, 0), (3, 1), (2, 2), (1, 3), (0, 4)]
+        for i, j in integer_pairs:
+            test_update = sp.poly((self._xt.update_relation**i) * (self._yt.update_relation**j), [var.sympy_rep for var in self._base_variables])
+            test_iterate(test_update, self._base_variables, self._variable_dependence_graph, self._derived_variables)
+
     def test_eq_hash(self):
         foo1 = DerivedVariable({self._xt : 1, self._sin_thetat : 1}, None)
         foo2 = DerivedVariable({self._sin_thetat : 1, self._xt : 1}, None)
@@ -53,6 +59,7 @@ class TestThing(object):
         assert (foo2 in set1)
         set1.add(foo2)
         assert len(set1) == 1
+
 tt = TestThing()
 tt.setup()
-tt.test_eq_hash()
+tt.test_all()

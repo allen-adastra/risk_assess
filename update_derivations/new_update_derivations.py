@@ -147,8 +147,8 @@ def test_iterate(poly_to_check, base_variables, dependence_graph, derived_variab
     print("LEFTOVER")
     print(things_to_expand)
     print("NUmber of derived variables " + str(len(derived_variables)))
-    power_maps = {var.sympy_rep for var in derived_variables}
-    print("NUmber of unique sympy reps " + str(len(power_maps)))
-    for var in derived_variables:
-        print("Variable: " + str(var.sympy_rep))
-        print("Expansion: " + str(var.update_relation))
+    # power_maps = {var.sympy_rep for var in derived_variables}
+    # print("NUmber of unique sympy reps " + str(len(power_maps)))
+    # for var in derived_variables:
+    #     print("Variable: " + str(var.sympy_rep))
+    #     print("Expansion: " + str(var.update_relation))
