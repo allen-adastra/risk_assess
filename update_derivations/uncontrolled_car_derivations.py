@@ -74,3 +74,16 @@ class UncontrolledCarDerivations(object):
             derived_base_variables_to_check, derived_base_variables = iterate_relations(derived_base_variables_to_check, self._base_variables, self._variable_dependence_graph, derived_base_variables)
             iters += 1
         return derived_base_variables_to_check, iters
+
+    def derive_fourth_x(self):
+        derived_base_variables = [DerivedVariable([self._xt, self._sin_thetat], None),
+                            DerivedVariable([self._xt, self._cos_thetat], None),
+                            DerivedVariable([self._yt, self._sin_thetat], None),
+                            DerivedVariable([self._yt, self._cos_thetat], None)]
+        fourth_moment_update = sp.poly(self._xt.update_relation ** 4, self._base_variables.sympy_reps)
+        fourth_moment = DerivedVariable([self._xt, self._xt, self._xt, self._xt], fourth_moment_update)
+        derived_base_variables += [fourth_moment]
+        derived_base_variables_to_check = [fourth_moment]
+        for i in range(3):
+            derived_base_variables_to_check, derived_base_variables = iterate_relations(derived_base_variables_to_check, self._base_variables, self._variable_dependence_graph, derived_base_variables)
+            print(derived_base_variables_to_check)
