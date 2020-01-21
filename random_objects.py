@@ -92,11 +92,17 @@ A sequence of Gaussian Mixture Models (GMMs) that represents predicted controls.
 The weights are invariant across time.
 """
 class GmmControlSequence(object):
-    def __init__(self, gmms):
+    def __init__(self, gmms, dt, max_weight_error_tolerance= 1e-6):
+        """
+        Args:
+            gmms (list of instances of GMMs): For every bivariate normal, the first one is accel and second is steer
+        """
         self._gmms = gmms
         self._n_components = len(self._gmms[0].component_random_variables)
         self.check_consistency()
         self._weights = self._gmms[0].component_probabilities # If consistent, all the GMMs will have same component probs
+
+        assert abs(sum(self._weights) - 1) < max_weight_error_tolerance
         self.generate_rv_array_rep()
 
     @property
@@ -104,9 +110,13 @@ class GmmControlSequence(object):
         return self._array_rv_rep
 
     @classmethod
-    def from_prediction(cls, prediction):
+    def from_prediction(cls, prediction, dt):
         """
         Convert a prediction output from the deep net into an instance of GmmControlSequence.
+        Scale the parameters from the deep net according to the time step.
+        Args:
+            prediction (output of PyTorch deep net)
+            dt (scalar) : seconds in between each time step
         """
         gmms = []
         for pre in prediction:
@@ -125,12 +135,12 @@ class GmmControlSequence(object):
             for i in range(n_accel_modes):
                 for j in range(n_alpha_modes):
                     w = weights_accel[i] * weights_alpha[j]
-                    mu = np.array([[mus_accel[i]], [mus_alpha[j]]])
-                    cov = np.array([[sigs_accel[i], 0], [sigs_alpha[j], 0]])
+                    mu = dt * np.array([[mus_accel[i]], [mus_alpha[j]]])
+                    cov = (dt**2) * np.array([[sigs_accel[i]**2, 0], [0, sigs_alpha[j]**2]])
                     mn = MultivariateNormal(mu, cov)
                     mixture_components[i * n_alpha_modes + j] = (w, mn)
             gmms.append(GMM(mixture_components))
-        gmm_control_seq = cls(gmms)
+        gmm_control_seq = cls(gmms, dt)
         return gmm_control_seq
 
     def generate_rv_array_rep(self):

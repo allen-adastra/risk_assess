@@ -74,7 +74,7 @@ def propagate_one_step(state, w_theta, w_v):
     # Compute E[x_{t+1} v_{t+1} sin(theta_{t+1})]
     E_xvs_new = state.E_xvs * E_cos_w_theta + state.E_xvc * E_sin_w_theta\
                 + state.E2_v * E_cos_theta_sin_theta * E_cos_w_theta\
-                + state.E2_v * E_sin_w_theta * cos_w_theta.compute_moment(2)\
+                + state.E2_v * E_sin_w_theta * E2_cos_w_theta\
                 + state.E_v * E_w_v * E_cos_theta_sin_theta * E_cos_w_theta\
                 + state.E_v * E_w_v * E_sin_w_theta * E2_cos_theta\
                 + E_w_v * state.E_xs * E_cos_w_theta\

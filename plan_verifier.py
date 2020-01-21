@@ -1,5 +1,5 @@
 from plan_verification.geom_utils import Ellipse, rotation_matrix, change_frame
-from plan_verification.models import simulate_deterministic
+from plan_verification.models import simulate_deterministic, propagate_moments
 import numpy as np
 import math
 import time
@@ -44,20 +44,25 @@ class PlanVerifier(object):
         """
         l = half_space.line
         E_z = l.a1 * moments.E_x + l.a2 * moments.E_y + l.b
-        E2_z = l.a1**2 * moments.E2_x + 2 * l.a1 * l.a2 * moments.E_xy + 2 * l.a1 * l.b * moments.E_x + l.a2**2 * moments.E2_y\
-              + 2 * l.a2 * l.b * moments.E_y + l.b**2
-        return (E2_z - E_z**2)/E2_z
-    
-    def assess_risk_monte_carlo(self, gmm_control_sequence, x0, y0, v0, theta0, n_samples, dt):
+        # Chebyshevs Inequality is only valid for the case when the expected value is greater than zero.
+        if E_z > 0:
+            E2_z = l.a1**2 * moments.E2_x + 2 * l.a1 * l.a2 * moments.E_xy + 2 * l.a1 * l.b * moments.E_x + l.a2**2 * moments.E2_y\
+                + 2 * l.a2 * l.b * moments.E_y + l.b**2
+            return (E2_z - E_z**2)/E2_z
+        else:
+            return None
+    def assess_risk_monte_carlo(self, gmm_control_sequence, x0, y0, v0, theta0, n_samples):
         """
         Args:
             gmm_control_sequence (instance of GmmControlSequence)
             x0 (scalar): initial x position of the agent
             y0 (scalar): initial y position of the agent
         """
+        t_start = time.time()
+
         # Sample control sequences and propagate them into states.
         accel_samps, steer_samps = gmm_control_sequence.sample(n_samples)
-        agent_xs, agent_ys, agent_vs, thetas = simulate_deterministic(x0, y0, v0, theta0, accel_samps, steer_samps, dt)
+        agent_xs, agent_ys, agent_vs, thetas = simulate_deterministic(x0, y0, v0, theta0, accel_samps, steer_samps, 1.0) # gmm_control_sequence applies dt
         # Propagating controls introduces "extra steps". Limit ourselves to this number of steps.
         n_steps = len(self.xs) - 2
 
@@ -83,7 +88,32 @@ class PlanVerifier(object):
             res = (agent_xys.T.dot(Q)*agent_xys.T).sum(axis=1)
             n_collision = np.argwhere(res <= 1.0).size
             risks[i] = float(n_collision)/float(n_samples)
-        return risks, agent_xs, agent_ys
+        t_total = time.time() - t_start
+        return risks, agent_xs, agent_ys, t_total
+
+    def assess_risk_chebyshev_halfspace(self, gmm_control_sequence, initial_agent_state, n_lines):
+        accel_seqs = gmm_control_sequence.array_rep["accels"]
+        steer_seqs = gmm_control_sequence.array_rep["steers"]
+        weights = gmm_control_sequence.array_rep["weights"]
+        # Generate half space sets.
+        ts = np.linspace(0, 2 * math.pi, n_lines)
+        ellipses = self.generate_ellipses(self.car_coord_ellipse)
+        half_space_sets = len(ellipses) * [None]
+        for i, e in enumerate(ellipses):
+            half_space_sets[i] = set(e.generate_halfspaces_containing_ellipse(ts))
+
+        # Time the time it takes to propagate the moments and apply Chebyshev's inequality.
+        t_start = time.time()
+        prob_bounds = len(half_space_sets) * [0]
+        for accel_seq, steer_seq, weight in zip(accel_seqs, steer_seqs, weights):
+            moments = propagate_moments(initial_agent_state, accel_seq, steer_seq)
+            for i in range(len(moments)):
+                # The function chebchebyshev_bound_halfspace returns None when Chebyshev doesn't hold.
+                probs = [self.chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]]
+                valid_probs = [p for p in probs if p is not None]
+                prob_bounds[i] += weight * min(valid_probs)
+        t_total = time.time() - t_start
+        return prob_bounds, t_total
 
     def assess_risk_moments(self, moments, n_lines):
         """
