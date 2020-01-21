@@ -102,6 +102,8 @@ class Ellipse(object):
         for i in range(n_lines):
             if abs(xys_unrotated_origin[1, i]) < 1e-6:
                 # Approximately zero
+                if sin_theta == 0.0:
+                    sin_theta = 1e-6 # hack :)
                 ms[i] = cos_theta/(-sin_theta)
             else:
                 m1 = -(xys_unrotated_origin[0, i]/xys_unrotated_origin[1, i]) * b_sq_over_a_sq

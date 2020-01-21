@@ -45,6 +45,10 @@ def simulate_deterministic(x0, y0, v0, theta0, accels, steers, dt):
     # x and y positions are just the cumulative sums of the v * cos(theta) and v * sin(theta) over time
     xs = np.cumsum(np.hstack((x0_rep, dt_vs_cos_thetas)), axis = 1)
     ys = np.cumsum(np.hstack((y0_rep, dt_vs_sin_thetas)), axis = 1)
+
+    # xs and ys have one extra element compared to vs and thetas.
+    xs = xs[:, :-1]
+    ys = ys[:, :-1]
     return xs, ys, vs, thetas
 
 def propagate_one_step(state, w_theta, w_v):
@@ -162,13 +166,13 @@ def propagate_one_step(state, w_theta, w_v):
     new_state.theta.add_rv(w_theta)
     return new_state
     
-def propagate_moments(initial_state, w_thetas, w_vs):
+def propagate_moments(initial_state, w_vs, w_thetas):
     """
     Given some initial 
     Args:
         state (instance of UncontrolledCarState)
-        w_thetas (list of instances of RandomVariable)
         w_vs (list of instances of RandomVariable)
+        w_thetas (list of instances of RandomVariable)
     """
     states = [initial_state]
     assert len(w_thetas) == len(w_vs)

@@ -99,6 +99,10 @@ class GmmControlSequence(object):
         self._weights = self._gmms[0].component_probabilities # If consistent, all the GMMs will have same component probs
         self.generate_rv_array_rep()
 
+    @property
+    def array_rep(self):
+        return self._array_rv_rep
+
     @classmethod
     def from_prediction(cls, prediction):
         """
