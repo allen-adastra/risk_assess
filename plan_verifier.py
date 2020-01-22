@@ -5,7 +5,34 @@ import math
 import time
 from plan_verification.mvn_quad_form import GmmQuadForm
 from copy import copy, deepcopy
-
+import multiprocessing
+from functools import partial
+def chebyshev_bound_halfspace(half_space, moments):
+    """
+    Args:
+        half_space: instance of HalfSpace
+        moments: instance of UncontrolledCarState
+    In this function, we think of the random variable z = a1 * x + a2 * y + b
+    """
+    l = half_space.line
+    E_z = l.a1 * moments.E_x + l.a2 * moments.E_y + l.b
+    # Chebyshevs Inequality is only valid for the case when the expected value is greater than zero.
+    if E_z > 0:
+        E2_z = l.a1**2 * moments.E2_x + 2 * l.a1 * l.a2 * moments.E_xy + 2 * l.a1 * l.b * moments.E_x + l.a2**2 * moments.E2_y\
+            + 2 * l.a2 * l.b * moments.E_y + l.b**2
+        return (E2_z - E_z**2)/E2_z
+    else:
+        return None
+def test(initial_agent_state, half_space_sets, input):
+    accel_seq, steer_seq, weight = input
+    moments = propagate_moments(initial_agent_state, accel_seq, steer_seq)
+    component_probs = len(moments)  * [0]
+    for i in range(len(moments)):
+        # The function chebyshev_bound_halfspace returns None when Chebyshev doesn't hold.
+        probs = [chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]]
+        valid_probs = [p for p in probs if p is not None]
+        component_probs[i] += weight * min(valid_probs)
+    return component_probs
 class PlanVerifier(object):
     def __init__(self, xs, ys, vs, thetas, car_coord_ellipse):
         """
@@ -35,22 +62,7 @@ class PlanVerifier(object):
             ellipses[i] = Ellipse(cce.a, cce.b, x + cce.x_center, y + cce.y_center, t + cce.theta)
         return ellipses
 
-    def chebyshev_bound_halfspace(self, half_space, moments):
-        """
-        Args:
-            half_space: instance of HalfSpace
-            moments: instance of UncontrolledCarState
-        In this function, we think of the random variable z = a1 * x + a2 * y + b
-        """
-        l = half_space.line
-        E_z = l.a1 * moments.E_x + l.a2 * moments.E_y + l.b
-        # Chebyshevs Inequality is only valid for the case when the expected value is greater than zero.
-        if E_z > 0:
-            E2_z = l.a1**2 * moments.E2_x + 2 * l.a1 * l.a2 * moments.E_xy + 2 * l.a1 * l.b * moments.E_x + l.a2**2 * moments.E2_y\
-                + 2 * l.a2 * l.b * moments.E_y + l.b**2
-            return (E2_z - E_z**2)/E2_z
-        else:
-            return None
+
     def assess_risk_monte_carlo(self, gmm_control_sequence, x0, y0, v0, theta0, n_samples):
         """
         Args:
@@ -91,6 +103,8 @@ class PlanVerifier(object):
         t_total = time.time() - t_start
         return risks, agent_xs, agent_ys, t_total
 
+
+
     def assess_risk_chebyshev_halfspace(self, gmm_control_sequence, initial_agent_state, n_lines):
         accel_seqs = gmm_control_sequence.array_rep["accels"]
         steer_seqs = gmm_control_sequence.array_rep["steers"]
@@ -103,16 +117,14 @@ class PlanVerifier(object):
             half_space_sets[i] = set(e.generate_halfspaces_containing_ellipse(ts))
 
         # Time the time it takes to propagate the moments and apply Chebyshev's inequality.
+        pool = multiprocessing.Pool()
         t_start = time.time()
         prob_bounds = len(half_space_sets) * [0]
-        for accel_seq, steer_seq, weight in zip(accel_seqs, steer_seqs, weights):
-            moments = propagate_moments(initial_agent_state, accel_seq, steer_seq)
-            for i in range(len(moments)):
-                # The function chebchebyshev_bound_halfspace returns None when Chebyshev doesn't hold.
-                probs = [self.chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]]
-                valid_probs = [p for p in probs if p is not None]
-                prob_bounds[i] += weight * min(valid_probs)
+
+        test_der = partial(test, initial_agent_state, half_space_sets)
+        res = pool.map(test_der, list(zip(accel_seqs, steer_seqs, weights)))
         t_total = time.time() - t_start
+        print(t_total)
         return prob_bounds, t_total
 
     def assess_risk_moments(self, moments, n_lines):
@@ -129,8 +141,9 @@ class PlanVerifier(object):
         for i, e in enumerate(ellipses):
             half_space_sets[i] = set(e.generate_halfspaces_containing_ellipse(ts))
         prob_bounds = len(moments) * [None]
+        prob_bounds
         for i in range(len(moments)):
-            prob_bounds[i] = min([self.chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]])
+            prob_bounds[i] = min([chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]])
         return prob_bounds
 
     def prepare_gmm_quad_forms(self, gmm_traj):

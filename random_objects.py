@@ -92,7 +92,7 @@ A sequence of Gaussian Mixture Models (GMMs) that represents predicted controls.
 The weights are invariant across time.
 """
 class GmmControlSequence(object):
-    def __init__(self, gmms, dt, max_weight_error_tolerance= 1e-6):
+    def __init__(self, gmms, dt, max_weight_error_tolerance= 1e-6 ):
         """
         Args:
             gmms (list of instances of GMMs): For every bivariate normal, the first one is accel and second is steer

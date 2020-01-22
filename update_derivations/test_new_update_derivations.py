@@ -24,8 +24,9 @@ class TestThing(object):
         self._cos_thetat = BaseVariable(cos_thetat, float("inf"), sp.expand_trig(sp.cos(thetat + wthetat)))
         self._sin_wthetat = BaseVariable(sin_wthetat, float("inf"), None)
         self._cos_wthetat = BaseVariable(cos_wthetat, float("inf"), None)
+        self._wvt = BaseVariable(wvt, float("inf"), None)
 
-        self._base_variables = [self._xt, self._yt, self._vt, self._sin_thetat, self._cos_thetat, self._sin_wthetat, self._cos_wthetat]
+        self._base_variables = [self._xt, self._yt, self._vt, self._sin_thetat, self._cos_thetat, self._sin_wthetat, self._cos_wthetat, self._wvt]
 
         self._variable_dependence_graph = nx.Graph()
         self._variable_dependence_graph.add_nodes_from(self._base_variables)
@@ -40,10 +41,10 @@ class TestThing(object):
                                     DerivedVariable({self._yt : 1, self._cos_thetat : 1}, None)}
 
     def test1(self):
-        test_update = sp.poly(self._xt.update_relation**4, [var.sympy_rep for var in self._base_variables])
+        test_update = sp.poly(self._xt.update_relation * self._yt.update_relation, [var.sympy_rep for var in self._base_variables])
         res = test_iterate(test_update, self._base_variables, self._variable_dependence_graph, self._derived_variables)
-        test_update = sp.poly(self._xt.update_relation**2 * self._yt.update_relation**2, [var.sympy_rep for var in self._base_variables])
-        res = test_iterate(test_update, self._base_variables, self._variable_dependence_graph, self._derived_variables)
+        for var in self._derived_variables:
+            print(var.sympy_rep)
 
     def test_all(self):
         integer_pairs = [(2, 0), (1,1), (0, 2), (4, 0), (3, 1), (2, 2), (1, 3), (0, 4)]
