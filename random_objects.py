@@ -4,6 +4,7 @@ import math
 import cmath
 from scipy.special import hyp1f1, comb
 from scipy.stats import norm, ncx2, chi2
+import scipy.io
 
 class RandomVariable(object):
     def __init__(self):
@@ -300,6 +301,29 @@ class GmmTrajectory(object):
         # Apply to each component of each GMM in the trajectory.
         for gmm in self._gmms:
             gmm.change_frame(offset_vec, rotation_matrix)
+
+    def save_as_matfile(self, directory, filename):
+        """
+        Save parameters of this GMM trajectory as a mat file
+        """
+        if ".mat" not in filename:
+            filename = filename + ".mat"
+        if directory[-1] != "/":
+            directory = directory + "/"
+        fullpath = directory + filename
+        matfile_dic = {}
+        for i in range(self._n_components):
+            comp_key = "component_" + str(i)
+            mean_traj = self._mean_trajectories[i]
+            cov_traj = self._covariance_trajectories[i]
+            n_steps = len(mean_traj)
+            mean_array = np.zeros((2, n_steps))
+            cov_array = np.zeros((2, 2, n_steps))
+            for j in range(n_steps):
+                mean_array[:, j] = mean_traj[j]
+                cov_array[:, :, j] = cov_traj[j]
+            matfile_dic[comp_key] = {"means" : mean_array, "covariances" : cov_array, "weight" : self._weights[i]}
+        scipy.io.savemat(fullpath, matfile_dic)
 
 class MixtureModel(RandomVariable):
     def __init__(self, mixture_components, weight_tolerance = 1e-6):

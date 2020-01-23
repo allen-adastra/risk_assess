@@ -59,7 +59,6 @@ def propagate_one_step(state, w_theta, w_v):
         w_theta (instance of RandomVariable)
         w_v (instance of RandomVariable)
     """
-    tstart = time.time()
     cos_theta = state.theta.cos_applied()
     sin_theta = state.theta.sin_applied()
     cos_w_theta = CosSumOfRVs(0, [w_theta])
@@ -71,7 +70,7 @@ def propagate_one_step(state, w_theta, w_v):
     E2_cos_theta = cos_theta.compute_moment(2)
     E2_sin_theta = sin_theta.compute_moment(2)
     E_w_v = w_v.compute_moment(1)
-    tstart2 = time.time()
+    
     # Compute E[x_{t+1} v_{t+1} sin(theta_{t+1})]
     E_xvs_new = state.E_xvs * E_cos_w_theta + state.E_xvc * E_sin_w_theta\
                 + state.E2_v * E_cos_theta_sin_theta * E_cos_w_theta\

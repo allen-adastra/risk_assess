@@ -1,4 +1,4 @@
-from new_update_derivations import *
+from update_derivier import *
 import sympy as sp
 import networkx as nx
 
@@ -40,17 +40,23 @@ class TestThing(object):
                                     DerivedVariable({self._yt : 1, self._sin_thetat : 1}, None),
                                     DerivedVariable({self._yt : 1, self._cos_thetat : 1}, None)}
 
+    def print_derived_relations(self):
+        for var in self._derived_variables:
+            print("Variable " + str(var.sympy_rep))
+            if var.update_relation:
+                print(sp.expand(var.update_relation))
+            print("\n")
+
     def test1(self):
         test_update = sp.poly(self._xt.update_relation * self._yt.update_relation, [var.sympy_rep for var in self._base_variables])
         res = test_iterate(test_update, self._base_variables, self._variable_dependence_graph, self._derived_variables)
-        for var in self._derived_variables:
-            print(var.sympy_rep)
 
     def test_all(self):
         integer_pairs = [(2, 0), (1,1), (0, 2), (4, 0), (3, 1), (2, 2), (1, 3), (0, 4)]
         for i, j in integer_pairs:
             test_update = sp.poly((self._xt.update_relation**i) * (self._yt.update_relation**j), [var.sympy_rep for var in self._base_variables])
             test_iterate(test_update, self._base_variables, self._variable_dependence_graph, self._derived_variables)
+        self.print_derived_relations()
 
     def test_eq_hash(self):
         foo1 = DerivedVariable({self._xt : 1, self._sin_thetat : 1}, None)

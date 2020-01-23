@@ -1,4 +1,4 @@
-function [] = univariate_sos_risk_bound(mus)
+function [risk_bound] = univariate_sos_risk_bound(mus)
 % mus: vector of moments [zeroth order, first order, second order, ...]
 
 n = numel(mus); % Number of moments
@@ -38,5 +38,6 @@ F = [coeffs_lhs == coeffs_rhs; sos(p); sos(s1); sos(s2)];
 obj = cs * mus';
 ops = sdpsettings('solver', 'scs');
 sol = solvesos(F,obj,ops,[cs, s1_coeff, s2_coeff]);
+risk_bound = value(obj);
 end
 
