@@ -23,7 +23,8 @@ def chebyshev_bound_halfspace(half_space, moments):
         return (E2_z - E_z**2)/E2_z
     else:
         return None
-def test(initial_agent_state, half_space_sets, input):
+
+def evaluate_component(initial_agent_state, half_space_sets, input):
     accel_seq, steer_seq, weight = input
     moments = propagate_moments(initial_agent_state, accel_seq, steer_seq)
     component_probs = len(moments)  * [0]
@@ -33,6 +34,7 @@ def test(initial_agent_state, half_space_sets, input):
         valid_probs = [p for p in probs if p is not None]
         component_probs[i] += weight * min(valid_probs)
     return component_probs
+
 class PlanVerifier(object):
     def __init__(self, xs, ys, vs, thetas, car_coord_ellipse):
         """
@@ -103,8 +105,6 @@ class PlanVerifier(object):
         t_total = time.time() - t_start
         return risks, agent_xs, agent_ys, t_total
 
-
-
     def assess_risk_chebyshev_halfspace(self, gmm_control_sequence, initial_agent_state, n_lines):
         accel_seqs = gmm_control_sequence.array_rep["accels"]
         steer_seqs = gmm_control_sequence.array_rep["steers"]
@@ -119,32 +119,16 @@ class PlanVerifier(object):
         # Time the time it takes to propagate the moments and apply Chebyshev's inequality.
         pool = multiprocessing.Pool()
         t_start = time.time()
-        prob_bounds = len(half_space_sets) * [0]
-
-        test_der = partial(test, initial_agent_state, half_space_sets)
-        res = pool.map(test_der, list(zip(accel_seqs, steer_seqs, weights)))
+        evaluate_component_func = partial(evaluate_component, initial_agent_state, half_space_sets)
+        component_probs = pool.map(evaluate_component_func, list(zip(accel_seqs, steer_seqs, weights)))
+        prob_bounds = np.zeros((1, len(component_probs[0])))
+        for weight, comp in zip(weights, component_probs):
+            prob_bounds += weight * np.asarray(comp)
+        prob_bounds = prob_bounds.tolist()[0]
         t_total = time.time() - t_start
-        print(t_total)
+        pool.close()
+        pool.join()
         return prob_bounds, t_total
-
-    def assess_risk_moments(self, moments, n_lines):
-        """
-        Given a list of instances of UncontrolledCarState associated with an uncontrolled agent,
-        assess the risk of this given plan.
-        Args:
-            moments: list of instances of UncontrolledCarState
-            n_lines: number of lines to approximate the ellipse with
-        """
-        ts = np.linspace(0, 2 * math.pi, n_lines)
-        ellipses = self.generate_ellipses(self.car_coord_ellipse)
-        half_space_sets = len(ellipses) * [None]
-        for i, e in enumerate(ellipses):
-            half_space_sets[i] = set(e.generate_halfspaces_containing_ellipse(ts))
-        prob_bounds = len(moments) * [None]
-        prob_bounds
-        for i in range(len(moments)):
-            prob_bounds[i] = min([chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]])
-        return prob_bounds
 
     def prepare_gmm_quad_forms(self, gmm_traj):
         gmms = gmm_traj.gmms

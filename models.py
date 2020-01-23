@@ -71,7 +71,6 @@ def propagate_one_step(state, w_theta, w_v):
     E2_cos_theta = cos_theta.compute_moment(2)
     E2_sin_theta = sin_theta.compute_moment(2)
     E_w_v = w_v.compute_moment(1)
-    print("Time to compute the trig moments and stuf: " + str(time.time() - tstart))
     tstart2 = time.time()
     # Compute E[x_{t+1} v_{t+1} sin(theta_{t+1})]
     E_xvs_new = state.E_xvs * E_cos_w_theta + state.E_xvc * E_sin_w_theta\

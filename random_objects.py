@@ -119,7 +119,7 @@ class GmmControlSequence(object):
             dt (scalar) : seconds in between each time step
         """
         gmms = []
-        for pre in prediction:
+        for tstep, pre in enumerate(prediction):
             weights_accel = np.array(pre['lweights_acc'][0].exp().tolist())
             weights_alpha = np.array(pre['lweights_alpha'][0].exp().tolist())
             mus_accel = np.array(pre['mus_acc'][0].tolist())
