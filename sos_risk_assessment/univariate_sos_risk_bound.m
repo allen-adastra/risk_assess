@@ -1,4 +1,4 @@
-function [risk_bound, flag] = univariate_sos_risk_bound(mus)
+function [risk_bound, flag, sol] = univariate_sos_risk_bound(mus)
 % For some random variable X, upper bound the probability:
 % Prob(X <= 0)
 % By solving a univariate SOS program.
