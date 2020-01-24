@@ -6,6 +6,10 @@ from scipy.special import hyp1f1, comb
 from scipy.stats import norm, ncx2, chi2
 import scipy.io
 
+def is_diag(M):
+    i, j = np.nonzero(M)
+    return np.all(i == j)
+
 class RandomVariable(object):
     def __init__(self):
         # Cached values.
@@ -423,6 +427,13 @@ class MultivariateNormal(object):
         # By convention, we need to translate before rotating.
         self._mean += -offset_vec
         self.rotate(rotation_matrix.T) # The inverse of a rotation matrix is equal to its transpose.
+    
+    def decompose_into_normals(self, override_independence = False):
+        if is_diag(self._covariance) or override_independence:
+            dimension = self._covariance.shape[0]
+            return [Normal(self._mean[i][0], (self._covariance[i][i])**0.5)for i in range(dimension)]
+        else:
+            raise Exception("Multivariate normal covariance matrix is not diagonal. Cannot decompose into individual normals.")
 
 class Normal(RandomVariable):
     def __init__(self, mean, std):

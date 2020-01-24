@@ -3,6 +3,8 @@ from scipy.stats import ncx2, chi2
 import scipy.linalg as sla
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
+import math
+import sympy as sp
 stats = importr('stats')
 cqf = importr('CompQuadForm')
 
@@ -67,6 +69,9 @@ def compute_ncx2_params(t, mu_x, Sigma_x, A):
     tstar = (t - mu_Q)/sigma_Q
     tspecial = tstar * sigma_chi + mu_chi
     return tspecial, dof, noncentrality
+    
+def check_symmetric(a, tol=1e-8):
+    return np.all(np.abs(a-a.T) < tol)
 
 """
 This random variable is defined by the following quadratic form:
@@ -86,6 +91,7 @@ class MvnQuadForm(object):
         self._A = A
         self._mu_x = mvn.mean
         self._Sigma_x = mvn.covariance
+        self._mvn = mvn
 
     def upper_tail_probability_monte_carlo(self, t, n_samples = 1e5):
         A = self._A
@@ -151,10 +157,68 @@ class MvnQuadForm(object):
         elif method == "noncentral_chisquare_cqf":
             return self.upper_tail_probability_noncentral_chisquare_cqf(t)
         elif method == "imhof":
-            return self.upper_tail_probability_imhof(t, kwargs['eps_abs'], kwargs['eps_rel'])
+            imhof_prob =  self.upper_tail_probability_imhof(t, kwargs['eps_abs'], kwargs['eps_rel'])
+            return imhof_prob
         else:
             raise NotImplementedError("Invalid method name.")
-        
+    
+###################################################
+# Stuff for farming moments to send off to MATLAB.
+###################################################
+    def compute_moments(self, dmax):
+        return [self.compute_moment(i) for i in range(dmax + 1)]
+
+    def dumb_compute_moment_way(self, d, n_samples = 1e6):
+        samples = np.random.multivariate_normal(self._mu_x.flatten(), self._Sigma_x, int(n_samples))
+        samples = samples.T
+        quad_form_samps = (samples.T.dot(self._A)*samples.T).sum(axis=1)
+        return np.mean(np.power(quad_form_samps, d))
+
+    def clever_compute_moment_way(self, d):
+        # TODO: not working becasue poop.
+        xy_moments_needed = 2 * d
+        normals = self._mvn.decompose_into_normals(override_independence = True)
+        x_moments = normals[0].compute_moments(xy_moments_needed)
+        y_moments = normals[1].compute_moments(xy_moments_needed)
+
+        # # We want to essentially perform a whitening transformation.
+        # # Let L be the cholesky factor of the covariance matrix.
+        # # If x is the original vector, then y = Lx is a whitened random vector.
+        # # So we have that L^(-1)y = x.
+        # # x^T A x then becomes (L^(-1)y)^T A (L^(-1)y)
+        # # Which is equal to y^T A_tilde y where A_tilde = L^(-1)^T A L^(-1)
+        # chol_sigma = np.linalg.cholesky(self._Sigma_x)
+        # inverse_chol_sigma = np.linalg.inv(chol_sigma)
+        # A_tilde = inverse_chol_sigma.T @ self._A @ inverse_chol_sigma
+
+        x = sp.Symbol("x")
+        y = sp.Symbol("y")
+        vec = sp.Matrix([[x], [y]])
+        quad_form = (vec.T @ self._A @ vec)[0]
+        quad_form_power = sp.poly(quad_form ** d, [x, y])
+        moment = 0
+        for coeff, exponent in zip(quad_form_power.coeffs(), quad_form_power.monoms()):
+            x_order, y_order = exponent
+            moment += coeff * (x_moments[x_order] * y_moments[y_order])
+        moment = float(moment)
+        return moment
+
+    def compute_moment(self, d):
+        if d == 0:
+            return 1
+        elif d == 1:
+            # https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
+            return np.trace(self._A @ self._Sigma_x) + (self._mu_x.T @ (self._A @ self._mu_x))[0][0]
+        elif d == 2:
+            # https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
+            if not check_symmetric(self._A):
+                A_mat = 0.5 * (self._A + self._A.T)
+            else:
+                A_mat = self._A
+            moment = 2 * np.trace(A_mat @ self._Sigma_x @ A_mat @ self._Sigma_x) + 4 * self._mu_x.T @ A_mat @ self._Sigma_x @ A_mat @ self._mu_x
+            return moment[0][0] + self.compute_moment(1)**2
+        elif d > 2:
+            return self.clever_compute_moment_way(d)
 
 class GmmQuadForm(object):
     """
@@ -177,10 +241,15 @@ class GmmQuadForm(object):
             P(Q > t)
         """
         upper_tail_prob = 0
-        for component_weight, mvnqf in self._mvn_components:
+        i = 0
+        for component_weight, mvnqf in self._mvn_components:                
             mvnqf_prob = mvnqf.upper_tail_probability(t, method, **kwargs)
             upper_tail_prob += component_weight * mvnqf_prob
+            i += 1
         # The calculated probability will have an associated numerical error. Check
         # that the numerical error does not exceed the tolerable amount.
         assert upper_tail_prob < 1.0 + overshoot_one_tolerance
         return min(upper_tail_prob, 1.0)
+    
+    def compute_moments(self, dmax):
+        return [mvnqf.compute_moments(dmax) for w, mvnqf in self._mvn_components]

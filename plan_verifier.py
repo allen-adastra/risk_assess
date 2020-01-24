@@ -7,6 +7,8 @@ from plan_verification.mvn_quad_form import GmmQuadForm
 from copy import copy, deepcopy
 import multiprocessing
 from functools import partial
+import scipy.io
+
 def chebyshev_bound_halfspace(half_space, moments):
     """
     Args:
@@ -156,8 +158,24 @@ class PlanVerifier(object):
         """
         tstart_prep = time.time()
         gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj)
+        if "scenario_number" in kwargs.keys():
+            print("Saving")
+            self.gmm_quad_form_moments_to_matfile(gmm_quad_forms, "/home/allen/plan_verification_rss_2020/plan_verification/sos_risk_assessment/data", kwargs["scenario_number"])
         t_prep = time.time() - tstart_prep
         tstart_risk_estimate = time.time()
         risk_estimates = [1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) for gmm_quad_form in gmm_quad_forms]
         t_risk_assess = time.time() - tstart_risk_estimate
         return risk_estimates, t_prep, t_risk_assess
+
+    def gmm_quad_form_moments_to_matfile(self, gmm_quad_forms, directory, scenario_number):
+        n_components = len(gmm_quad_forms[0]._mvn_components)
+        traj_components = n_components * [{"weight" : None, "moments" : []}]
+        weights = [w for w,_ in gmm_quad_forms[0]._mvn_components]
+        for w, component in zip(weights, traj_components):
+            component["weight"] = w
+        all_gmm_qf_moments = [gmm_qf.compute_moments(5) for gmm_qf in gmm_quad_forms]
+        for i in range(n_components):
+            traj_components[i]["moments"] = [gmm_qf_moments[i] for gmm_qf_moments in all_gmm_qf_moments]
+        for i, comp in enumerate(traj_components):
+            filename = directory + "/" + "position_gmm_component_scenario_" + str(scenario_number) + "_component_" + str(i) + ".mat"
+            scipy.io.savemat(filename, comp)
