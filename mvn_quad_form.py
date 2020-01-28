@@ -235,6 +235,15 @@ class GmmQuadForm(object):
         """
         self._mvn_components = [(prob, MvnQuadForm(A, mvn)) for prob, mvn in zip(gmm.component_probabilities, gmm.component_random_variables)]
     
+    def component_upper_tail_probs(self, t, method, overshoot_one_tolerance = 1e-6, **kwargs):
+        """
+        Compute the component probabilities:
+            P(Q_i > t)
+        Where Q_i is a component of Q.
+        """
+        component_probs = [mvnqf.upper_tail_probability(t, method, **kwargs) for _, mvnqf in self._mvn_components]
+        return component_probs
+
     def upper_tail_probability(self, t, method,  overshoot_one_tolerance = 1e-6, **kwargs):
         """
         Approximate the probability:

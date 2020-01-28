@@ -37,6 +37,9 @@ def evaluate_component(initial_agent_state, half_space_sets, input):
         component_probs[i] += weight * min(valid_probs)
     return component_probs
 
+def evalute_gmm_quad_form(kwargs, method, gmm_quad_form):
+    return 1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs)
+
 class PlanVerifier(object):
     def __init__(self, xs, ys, vs, thetas, car_coord_ellipse):
         """
@@ -147,6 +150,11 @@ class PlanVerifier(object):
             gmm_quad_forms[i] = GmmQuadForm(Q, gmm)
         return gmm_quad_forms
 
+    def assess_risk_gmms_component(self, gmm_traj, method, component_number, **kwargs):
+        gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj)
+        risk_estimates = [1 - gmm_quad_form.component_upper_tail_probs(1, method, **kwargs)[component_number] for gmm_quad_form in gmm_quad_forms]
+        return risk_estimates
+
     def assess_risk_gmms(self, gmm_traj, method, **kwargs):
         """
         Given a list of gaussian mixture models (GMMs) assess the risk of this plan
@@ -159,12 +167,15 @@ class PlanVerifier(object):
         tstart_prep = time.time()
         gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj)
         if "scenario_number" in kwargs.keys():
-            print("Saving")
             self.gmm_quad_form_moments_to_matfile(gmm_quad_forms, "/home/allen/plan_verification_rss_2020/plan_verification/sos_risk_assessment/data", kwargs["scenario_number"])
+        pool = multiprocessing.Pool()
+        time_step_func = partial(evalute_gmm_quad_form, kwargs, method)
         t_prep = time.time() - tstart_prep
         tstart_risk_estimate = time.time()
         risk_estimates = [1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) for gmm_quad_form in gmm_quad_forms]
         t_risk_assess = time.time() - tstart_risk_estimate
+        pool.close()
+        pool.join()
         return risk_estimates, t_prep, t_risk_assess
 
     def gmm_quad_form_moments_to_matfile(self, gmm_quad_forms, directory, scenario_number):
