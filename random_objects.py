@@ -429,7 +429,7 @@ class MultivariateNormal(object):
         """
         # By convention, we need to translate before rotating.
         self._mean += -offset_vec
-        self.rotate(rotation_matrix.T) # The inverse of a rotation matrix is equal to its transpose.
+        self.rotate(rotation_matrix)
     
     def decompose_into_normals(self, override_independence = False):
         if is_diag(self._covariance) or override_independence:
@@ -561,7 +561,7 @@ class CosSumOfRVs(RandomVariable):
     def compute_moment(self, order):
         # If there are no random variables, this is just a constant.
         if len(self.random_variables) == 0:
-            return self.c**order
+            return math.cos(self.c)**order
         if order not in self._moment_values.keys():
             if order == 1:
                 return np.real(self.compute_characteristic_function(1))
@@ -617,7 +617,7 @@ class SinSumOfRVs(RandomVariable):
     def compute_moment(self, order):
         # If there are no random variables, this is just a constant.
         if len(self.random_variables) == 0:
-            return self.c**order
+            return math.sin(self.c)**order
         
         if order not in self._moment_values.keys():
             if order == 1:
@@ -671,7 +671,7 @@ class CrossSumOfRVs(RandomVariable):
     def compute_moment(self, order):
         # If there are no random variables, this is just a constant
         if len(self.random_variables) == 0:
-            return self.c**order
+            return (math.cos(self.c) * math.sin(self.c))**order
             
         if order not in self._moment_values.keys():
             if order == 1:

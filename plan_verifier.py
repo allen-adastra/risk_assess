@@ -97,20 +97,21 @@ class PlanVerifier(object):
         Q[0][0] = 1.0/(self.car_coord_ellipse.a**2)
         Q[1][1] = 1.0/(self.car_coord_ellipse.b**2)
 
+
+
         # Risks at each time step.
         risks = n_steps * [None]
 
         # We will have to transform the position samples into the car coordinates at each time step.
-        for i in range(n_steps):
+        for i in range(n_steps):            
             ego_vehicle_position = np.array([[self.xs[i]],
                                              [self.ys[i]]])
-            rot_mat = rotation_matrix(self.thetas[i])
+            rot_mat = rotation_matrix(-self.thetas[i])
 
             # Each column is a sample [x; y]
             agent_xys = np.vstack((agent_xs[:, i], agent_ys[:, i]))
             change_frame_func = lambda vec : change_frame(vec, ego_vehicle_position, rot_mat)
             agent_xys = np.apply_along_axis(change_frame_func, 0, agent_xys) # Change the frame of each column
-
             # Evaluate the number of samples for which x'Qx <= 1 (i.e: collides with ellipse)
             res = (agent_xys.T.dot(Q)*agent_xys.T).sum(axis=1)
             n_collision = np.argwhere(res <= 1.0).size
@@ -168,7 +169,7 @@ class PlanVerifier(object):
         for i in range(len(gmms)):
             ego_vehicle_position = np.array([[self.xs[i]],
                                              [self.ys[i]]])
-            rot_mat = rotation_matrix(self.thetas[i])
+            rot_mat = rotation_matrix(-self.thetas[i])
             gmm = deepcopy(gmms[i])
             gmm.change_frame(ego_vehicle_position, rot_mat)
             gmm_quad_forms[i] = GmmQuadForm(Q, gmm)
