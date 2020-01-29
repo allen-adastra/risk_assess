@@ -446,7 +446,11 @@ class Normal(RandomVariable):
         # Cached values.
         self._char_fun_values = {}
         self._moment_values = {}
-    
+
+    def clear_cache(self):
+        self._char_fun_values = {}
+        self._moment_values = {}
+
     def compute_moment(self, order):
         if order not in self._moment_values.keys():
             self._moment_values[order] = norm.moment(order, loc = self._mean, scale = self._variance**0.5)
@@ -463,6 +467,7 @@ class Normal(RandomVariable):
     def scale(self, scale_factor):
         self._mean *= scale_factor
         self._variance *= (scale_factor**2)
+        self.clear_cache()
 
 class Constant(RandomVariable):
     def __init__(self, value):
@@ -529,6 +534,9 @@ class SumOfRVs(object):
     def sin_applied(self):
         return SinSumOfRVs(self.c, self.random_variables)
 
+    def cos_sin(self):
+        return CrossSumOfRVs(self.c, self.random_variables)
+
     def add_rv(self, rv):
         self.random_variables.append(rv)
 
@@ -545,8 +553,15 @@ class CosSumOfRVs(RandomVariable):
         # Cached values.
         self._char_fun_values = {}
         self._moment_values = {}
+    
+    def clear_cache(self):
+        self._char_fun_values = {}
+        self._moment_values = {}
         
     def compute_moment(self, order):
+        # If there are no random variables, this is just a constant.
+        if len(self.random_variables) == 0:
+            return self.c**order
         if order not in self._moment_values.keys():
             if order == 1:
                 return np.real(self.compute_characteristic_function(1))
@@ -581,11 +596,6 @@ class CosSumOfRVs(RandomVariable):
             self._char_fun_values[t] = cmath.exp(complex(0, t * self.c)) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
         return self._char_fun_values[t]
     
-    def add_rv(self, rv):
-        self.random_variables.append(rv)
-    
-    def add_constant(self, c):
-        self.c += c
 
 """
 Let x1, x2, ..., xn be n independent random variables and c be some constant.
@@ -600,7 +610,15 @@ class SinSumOfRVs(RandomVariable):
         self._char_fun_values = {}
         self._moment_values = {}
 
+    def clear_cache(self):
+        self._char_fun_values = {}
+        self._moment_values = {}
+
     def compute_moment(self, order):
+        # If there are no random variables, this is just a constant.
+        if len(self.random_variables) == 0:
+            return self.c**order
+        
         if order not in self._moment_values.keys():
             if order == 1:
                 return np.imag(self.compute_characteristic_function(1))
@@ -633,14 +651,8 @@ class SinSumOfRVs(RandomVariable):
         c + w_1 + ... + w_n
         """
         if t not in self._char_fun_values.keys():
-            self._char_fun_values[t] = cmath.exp(complex(0, 1) * t * self.c) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
+            self._char_fun_values[t] = cmath.exp(complex(0, t * self.c)) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
         return self._char_fun_values[t]
-
-    def add_rv(self, rv):
-        self.random_variables.append(rv)
-    
-    def add_constant(self, c):
-        self.c += c
 
 """
 Let x1, x2, ..., xn be n independent random variables and c be some constant.
@@ -651,23 +663,22 @@ class CrossSumOfRVs(RandomVariable):
     def __init__(self, c, random_variables):
         self.c = c
         self.random_variables = random_variables
-        self.cos_theta = CosSumOfRVs(c, random_variables)
-        self.sin_theta = SinSumOfRVs(c, random_variables)
 
         # Cached values.
         self._char_fun_values = {}
         self._moment_values = {}
 
     def compute_moment(self, order):
+        # If there are no random variables, this is just a constant
+        if len(self.random_variables) == 0:
+            return self.c**order
+            
         if order not in self._moment_values.keys():
             if order == 1:
                 self._moment_values[order] = 0.5 * np.imag(self.compute_characteristic_function(2))
             else:
                 raise Exception("Input order is not currently supported.")
         return self._moment_values[order]
-
-    def compute_covariance(self):
-        return self.compute_moment(1) - self.cos_theta.compute_moment(1) * self.sin_theta.compute_moment(1)
 
     def compute_characteristic_function(self, t):
         """
@@ -676,5 +687,5 @@ class CrossSumOfRVs(RandomVariable):
         c + w_1 + ... + w_n
         """
         if t not in self._char_fun_values.keys():
-            self._char_fun_values[t] = cmath.exp(complex(0, 1) * t * self.c) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
+            self._char_fun_values[t] =  cmath.exp(complex(0, t * self.c)) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
         return self._char_fun_values[t]

@@ -35,10 +35,8 @@ class TestThing(object):
                                                         (self._yt, self._cos_thetat)])
 
         # These were derived in the ICRA paper.
-        self._derived_variables = {DerivedVariable({self._xt : 1, self._sin_thetat : 1}, None),
-                                    DerivedVariable({self._xt : 1, self._cos_thetat : 1}, None),
-                                    DerivedVariable({self._yt : 1, self._sin_thetat : 1}, None),
-                                    DerivedVariable({self._yt : 1, self._cos_thetat : 1}, None)}
+        self._derived_variables = set()
+
 
     def print_derived_relations(self):
         for var in self._derived_variables:
@@ -50,6 +48,14 @@ class TestThing(object):
     def test1(self):
         test_update = sp.poly(self._xt.update_relation * self._yt.update_relation, [var.sympy_rep for var in self._base_variables])
         res = test_iterate(test_update, self._base_variables, self._variable_dependence_graph, self._derived_variables)
+
+
+    def test_max_order_2(self):
+        integer_pairs = [(2, 0), (1,1), (0, 2)]
+        for i, j in integer_pairs:
+            test_update = sp.poly((self._xt.update_relation**i) * (self._yt.update_relation**j), [var.sympy_rep for var in self._base_variables])
+            test_iterate(test_update, self._base_variables, self._variable_dependence_graph, self._derived_variables)
+        self.print_derived_relations()
 
     def test_all(self):
         integer_pairs = [(2, 0), (1,1), (0, 2), (4, 0), (3, 1), (2, 2), (1, 3), (0, 4)]
@@ -69,4 +75,4 @@ class TestThing(object):
 
 tt = TestThing()
 tt.setup()
-tt.test_all()
+tt.test_max_order_2()

@@ -18,11 +18,14 @@ def chebyshev_bound_halfspace(half_space, moments):
     """
     l = half_space.line
     E_z = l.a1 * moments.E_x + l.a2 * moments.E_y + l.b
-    # Chebyshevs Inequality is only valid for the case when the expected value is greater than zero.
+    #Chebyshevs Inequality is only valid for the case when the expected value is greater than zero.
     if E_z > 0:
-        E2_z = l.a1**2 * moments.E2_x + 2 * l.a1 * l.a2 * moments.E_xy + 2 * l.a1 * l.b * moments.E_x + l.a2**2 * moments.E2_y\
-            + 2 * l.a2 * l.b * moments.E_y + l.b**2
-        return (E2_z - E_z**2)/E2_z
+        variance_x = moments.E2_x - moments.E_x**2
+        variance_y = moments.E2_y - moments.E_y**2
+        covariance_xy = moments.E_xy - moments.E_x * moments.E_y
+        variance_z = (l.a1**2) * variance_x + (l.a2**2) * variance_y + 2 * l.a1 * l.a2 * covariance_xy
+        E2_z = variance_z + E_z**2
+        return variance_z/E2_z
     else:
         return None
 
@@ -34,7 +37,10 @@ def evaluate_component(initial_agent_state, half_space_sets, input):
         # The function chebyshev_bound_halfspace returns None when Chebyshev doesn't hold.
         probs = [chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]]
         valid_probs = [p for p in probs if p is not None]
-        component_probs[i] += weight * min(valid_probs)
+        if valid_probs:
+            component_probs[i] = weight * min(valid_probs)
+        else:
+            component_probs[i] = None
     return component_probs
 
 def evalute_gmm_quad_form(kwargs, method, gmm_quad_form):
@@ -102,9 +108,9 @@ class PlanVerifier(object):
 
             # Each column is a sample [x; y]
             agent_xys = np.vstack((agent_xs[:, i], agent_ys[:, i]))
-
             change_frame_func = lambda vec : change_frame(vec, ego_vehicle_position, rot_mat)
             agent_xys = np.apply_along_axis(change_frame_func, 0, agent_xys) # Change the frame of each column
+
             # Evaluate the number of samples for which x'Qx <= 1 (i.e: collides with ellipse)
             res = (agent_xys.T.dot(Q)*agent_xys.T).sum(axis=1)
             n_collision = np.argwhere(res <= 1.0).size
@@ -135,6 +141,7 @@ class PlanVerifier(object):
         for i, e in enumerate(ellipses):
             half_space_sets[i] = set(e.generate_halfspaces_containing_ellipse(ts))
 
+
         # Time the time it takes to propagate the moments and apply Chebyshev's inequality.
         pool = multiprocessing.Pool()
         t_start = time.time()
@@ -142,6 +149,9 @@ class PlanVerifier(object):
         component_probs = pool.map(evaluate_component_func, list(zip(accel_seqs, steer_seqs, weights)))
         prob_bounds = np.zeros((1, len(component_probs[0])))
         for weight, comp in zip(weights, component_probs):
+            if None in comp:
+                # If Chebyshev bound failed, just return none for now.
+                return None, None
             prob_bounds += weight * np.asarray(comp)
         prob_bounds = prob_bounds.tolist()[0]
         t_total = time.time() - t_start

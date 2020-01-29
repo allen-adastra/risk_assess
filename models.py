@@ -51,121 +51,81 @@ def simulate_deterministic(x0, y0, v0, theta0, accels, steers, dt):
     ys = ys[:, :-1]
     return xs, ys, vs, thetas
 
-def propagate_one_step(state, w_theta, w_v):
-    """
-    Propagates UncontrolledCarState one step forward in time.
-    Args:
-        state (instance of UncontrolledCarState)
-        w_theta (instance of RandomVariable)
-        w_v (instance of RandomVariable)
-    """
-    cos_theta = state.theta.cos_applied()
-    sin_theta = state.theta.sin_applied()
-    cos_w_theta = CosSumOfRVs(0, [w_theta])
-    # Pre compute a bunch of relevant moments
-    E_cos_theta_sin_theta = CrossSumOfRVs(cos_theta.c, cos_theta.random_variables).compute_moment(1)
-    E_cos_w_theta = cos_w_theta.compute_moment(1)
-    E2_cos_w_theta = cos_w_theta.compute_moment(2)
-    E_sin_w_theta = SinSumOfRVs(0, [w_theta]).compute_moment(1)
-    E2_cos_theta = cos_theta.compute_moment(2)
-    E2_sin_theta = sin_theta.compute_moment(2)
-    E_w_v = w_v.compute_moment(1)
+
+def propagate_one_step(state, w_v, w_theta):
+    c = state.theta.cos_applied()
+    s = state.theta.sin_applied()
+    cs = CrossSumOfRVs(state.theta.c, state.theta.random_variables)
+    E_c = c.compute_moment(1)
+    E_s = s.compute_moment(1)
+    E2_c = c.compute_moment(2)
+    E2_s = s.compute_moment(2)
+    E_cs = cs.compute_moment(1)
+
+    # Compute moments of control variables.
+    E_cw = CosSumOfRVs(0, [w_theta]).compute_moment(1)
+    E_sw = SinSumOfRVs(0, [w_theta]).compute_moment(1)
+    E_wv = w_v.compute_moment(1)
+    E2_wv = w_v.compute_moment(2)
     
-    # Compute E[x_{t+1} v_{t+1} sin(theta_{t+1})]
-    E_xvs_new = state.E_xvs * E_cos_w_theta + state.E_xvc * E_sin_w_theta\
-                + state.E2_v * E_cos_theta_sin_theta * E_cos_w_theta\
-                + state.E2_v * E_sin_w_theta * E2_cos_w_theta\
-                + state.E_v * E_w_v * E_cos_theta_sin_theta * E_cos_w_theta\
-                + state.E_v * E_w_v * E_sin_w_theta * E2_cos_theta\
-                + E_w_v * state.E_xs * E_cos_w_theta\
-                + E_w_v * state.E_xc * E_sin_w_theta
+    # Renaming old moments.
+    E_v = state.E_v
+    E2_v = state.E2_v
+    E_xs = state.E_xs
+    E_ys = state.E_ys
+    E_xc = state.E_xc
+    E_yc = state.E_yc
+    E_xvs = state.E_xvs
+    E_xvc = state.E_xvc
+    E_yvs = state.E_yvs
+    E_yvc = state.E_yvc
+    E_x = state.E_x
+    E_y = state.E_y
+    E_xy = state.E_xy
+    E2_x = state.E2_x
+    E2_y = state.E2_y
 
-    # Compute E[x_{t+1} v_{t+1} cos(theta_{t+1})]
-    E_xvc_new = state.E_xvc * E_cos_w_theta - state.E_xvs * E_sin_w_theta\
-                - state.E2_v * E_cos_theta_sin_theta * E_sin_w_theta\
-                + state.E2_v * E2_cos_theta * E_cos_w_theta\
-                - state.E_v * E_w_v * E_cos_theta_sin_theta * E_sin_w_theta\
-                + state.E_v * E2_cos_theta * E_w_v * E_cos_w_theta\
-                - E_w_v * E_sin_w_theta * state.E_xs\
-                + E_w_v * E_cos_w_theta * state.E_xc
-    
-    # Compute E[y_{t+1} v_{t+1} sin(theta_{t+1})]
-    E_yvs_new = state.E_yvs * E_cos_w_theta + state.E_yvc * E_sin_w_theta\
-                + state.E2_v * E2_sin_theta * E_cos_w_theta\
-                + state.E2_v * E_cos_theta_sin_theta * E_sin_w_theta\
-                + state.E_v * E_w_v * E2_sin_theta * E_cos_w_theta\
-                + state.E_v * E_w_v * E_sin_w_theta * E_cos_theta_sin_theta\
-                + E_w_v * E_cos_w_theta * state.E_ys\
-                + E_w_v * E_sin_w_theta * state.E_yc
-
-    # Compute E[y_{t+1} v_{t+1} cos(theta_{t+1})]
-    E_yvc_new = state.E_yvc * E_cos_w_theta - state.E_yvs * E_sin_w_theta\
-                - state.E2_v * E2_sin_theta * E_sin_w_theta\
-                + state.E2_v * E_cos_theta_sin_theta * E_cos_w_theta\
-                - state.E_v * E_w_v * E2_sin_theta * E_sin_w_theta\
-                + state.E_v * E_w_v * E_cos_theta_sin_theta * E_cos_w_theta\
-                - E_w_v * E_sin_w_theta * state.E_ys\
-                + E_w_v * E_cos_w_theta * state.E_yc
-
-    # Compute E[x_{t+1} sin(theta_{t+1})]
-    E_xs_new = state.E_v * E_cos_w_theta * E_cos_theta_sin_theta\
-                + state.E_v * E_sin_w_theta * E2_cos_theta\
-                + state.E_xs * E_cos_w_theta + state.E_xc * E_sin_w_theta
-
-    # Compute E[x_{t+1} cos(theta_{t+1})]
-    E_xc_new = -state.E_v * E_sin_w_theta * E_cos_theta_sin_theta\
-            + state.E_v *E2_cos_theta * E_cos_w_theta\
-            - state.E_xs * E_sin_w_theta + state.E_xc * E_cos_w_theta
-
-    # Compute E[y_{t+1} sin(theta_{t+1})]
-    E_ys_new = state.E_v * E2_sin_theta * E_cos_w_theta\
-            + state.E_v * E_sin_w_theta * E_cos_theta_sin_theta\
-            + state.E_ys * E_cos_w_theta + state.E_yc * E_sin_w_theta
-
-    # Compute E[y_{t+1} cos(theta_{t+1})]
-    E_yc_new = -state.E_v * E_sin_w_theta * E2_sin_theta\
-            + state.E_v * E_cos_w_theta * E_cos_theta_sin_theta\
-            -state.E_ys * E_sin_w_theta + state.E_yc * E_cos_w_theta
-
-    # Compute E[v_{t+1}]
-    E_v_new = state.E_v + E_w_v
-
-    # Compute E[v_{t+1}^2] using the facts that:
-    #    Sigma_{x + y} = Sigma_x + Sigma_y
-    #    E[(x + y)^2] = Sigma_x + Sigma_y + E[x + y]^2
-    E2_v_new = (state.E2_v - state.E_v**2) + w_v.compute_variance() + E_v_new**2
-
-    E_x_new = state.E_x + state.E_v * cos_theta.compute_moment(1)
-    E_y_new = state.E_y + state.E_v * sin_theta.compute_moment(1)
-
-    # Update E[x_{t+1}y_{t+1}]
-    E_xy_new = state.E2_v * E_cos_theta_sin_theta + state.E_xvs + state.E_yvc + state.E_xy
-
-    # Update E[x_{t+1}^2]
-    E2_x_new = state.E2_v * E2_cos_theta + 2 * state.E_xvc + state.E2_x
-
-    # Update E[y_{t+1}^2]
-    E2_y_new = state.E2_v * E2_sin_theta + 2 * state.E_yvs + state.E2_y
-    
+    #
     new_state = deepcopy(state)
-    new_state.E_x = E_x_new
-    new_state.E_y = E_y_new
-    new_state.E_xy = E_xy_new
-    new_state.E2_x = E2_x_new
-    new_state.E2_y = E2_y_new
-    new_state.E_xvs = E_xvs_new
-    new_state.E_xvc = E_xvc_new
-    new_state.E_yvs = E_yvs_new
-    new_state.E_yvc = E_yvc_new
-    new_state.E_xs = E_xs_new
-    new_state.E_xc = E_xc_new
-    new_state.E_ys = E_ys_new
-    new_state.E_yc = E_yc_new
-    new_state.E_v = E_v_new
-    new_state.E2_v = E2_v_new
+
     new_state.theta.add_rv(w_theta)
-    return new_state
+
+    new_state.E_v = E_v + E_wv
+
+    new_state.E2_v = E2_v + 2 * E_v * E_wv + E2_wv
+
+    new_state.E_xs = E_v*E_cs*E_cs + E_v*E_sw*E2_c + E_xs*E_cw + E_xc * E_sw
+
+    new_state.E_ys = E_v*E2_s*E_cw + E_v*E_sw*E_cs + E_ys*E_cw + E_yc * E_sw
+
+    new_state.E_xc = -E_v*E_cs * E_sw + E_v*E2_c*E_cw - E_xs*E_sw + E_xc*E_cw
+
+    new_state.E_yc = -E_v*E2_s*E_sw + E_v*E_cs*E_cw - E_ys*E_sw + E_yc*E_cw
+
+    new_state.E_xvs = E2_v*E_cs*E_cw + E2_v*E_sw*E2_c+ E_v*E_wv*E_cs*E_cw + E_v*E_wv*E_sw*E2_c + E_xvs*E_cw +\
+          E_xvc * E_sw + E_wv * E_xs * E_cw  + E_wv * E_xc * E_sw
+
+    new_state.E_xvc = -E2_v*E_cs*E_sw + E2_v*E2_c*E_cw- E_v*E_wv*E_cs*E_sw+ E_v*E_wv*E2_c*E_cw -\
+          E_xvs*E_sw + E_xvc*E_cw- E_wv*E_xs*E_sw + E_wv*E_xc*E_cw
+
+    new_state.E_yvs = E2_v*E2_s*E_cw+ E2_v*E_cs*E_sw + E_v*E_wv*E2_s*E_cw+ E_v*E_wv*E_cs*E_sw +\
+          E_yvs*E_cw+ E_yvc*E_sw + E_wv*E_ys*E_cw+ E_wv*E_yc*E_sw
+
+    new_state.E_yvc = -E2_v*E2_s*E_sw + E2_v*E_cs*E_cw- E_v*E_wv*E2_s*E_sw + E_v*E_wv*E_cs*E_cw-\
+          E_yvs*E_sw + E_yvc*E_cw- E_wv*E_ys*E_sw + E_wv*E_yc*E_cw
     
+    new_state.E_x = E_x + E_v * E_c
+
+    new_state.E_y = E_y + E_v * E_s
+
+    new_state.E_xy = E2_v * E_cs + E_xvs + E_yvc + E_xy
+
+    new_state.E2_x = E2_v*E2_c + 2*E_xvc + E2_x
+
+    new_state.E2_y = E2_v*E2_s + 2*E_yvs + E2_y
+
+    return new_state
+
 def propagate_moments(initial_state, w_vs, w_thetas):
     """
     Given some initial 
@@ -177,7 +137,7 @@ def propagate_moments(initial_state, w_vs, w_thetas):
     states = [initial_state]
     assert len(w_thetas) == len(w_vs)
     for i in range(len(w_thetas)):
-        new_state = propagate_one_step(states[i], w_thetas[i], w_vs[i])
+        new_state = propagate_one_step(states[i], w_vs[i], w_thetas[i])
         states.append(new_state)
     return states
 
