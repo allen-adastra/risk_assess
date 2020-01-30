@@ -91,7 +91,10 @@ class MvnQuadForm(object):
         self._A = A
         self._mu_x = mvn.mean
         self._Sigma_x = mvn.covariance
-        self._mvn = mvn
+
+    def scale(self, t):
+        self._mu_x *= t
+        self._Sigma_x *= (t**2)
 
     def upper_tail_probability_monte_carlo(self, t, n_samples = 1e5):
         A = self._A
@@ -251,3 +254,37 @@ class GmmQuadForm(object):
         estimating Prob(Q(x) - t <= 0).
         """
         return [mvnqf.compute_moments(t, dmax) for w, mvnqf in self._mvn_components]
+
+class GmmQuadFormTrajectory(object):
+    def __init__(self, gmm_quad_forms):
+        """
+        Args:
+            gmm_quad_forms (list of instance of GmmQuadForm) sorted by time.
+        """
+        self._gmm_quad_forms = gmm_quad_forms
+        self._t = 1
+    
+    def normalize(self):
+        """
+        Instead of collision being defined as Q(x) <= 1, we normalize to t * Q(x) <= t
+        or t (Q(x) - 1) <= 0 where t is the 1/(max E[Q(x) - 1]) along the trajectory. This allows for
+        E[(Q(x) - 1)^n] <= 1 for all time steps, for all components, and for all moments
+        which is important for numerical stability of SOS programs. From wikipedia,
+        t Q(x) = Q(sqrt(t)x), so we just have to scale the MVNs.
+        """
+        expected_value_mvnqfs = []
+        for gmm_quad_form in self._gmm_quad_forms:
+            for _, mvn_quad_form in gmm_quad_form._mvn_components:
+                expected_value_mvnqfs.append(mvn_quad_form.compute_moment(self._t, 1))
+        self._t = (1.0/max(expected_value_mvnqfs))
+        assert self._t >= 0
+        for gmm_quad_form in self._gmm_quad_forms:
+            for _, mvn_quad_form in gmm_quad_form._mvn_components:
+                mvn_quad_form.scale(self._t**0.5)
+    
+    def compute_moments(self, dmax):
+        """
+        Computes moments of Q(x) - t so that Chebyshev and SOS can be applied to
+        Prob(Q(x) - t <= 0)
+        """
+        return [gmm_qf.compute_moments(self._t, dmax) for gmm_qf in self._gmm_quad_forms]

@@ -3,7 +3,7 @@ from plan_verification.models import simulate_deterministic, propagate_moments
 import numpy as np
 import math
 import time
-from plan_verification.mvn_quad_form import GmmQuadForm
+from plan_verification.mvn_quad_form import GmmQuadForm, GmmQuadFormTrajectory
 from copy import copy, deepcopy
 import multiprocessing
 from functools import partial
@@ -205,6 +205,9 @@ class PlanVerifier(object):
         return risk_estimates, t_prep, t_risk_assess
 
     def gmm_quad_form_moments_to_matfile(self, gmm_quad_forms, directory, scenario_number):
+        gmmqf_traj = GmmQuadFormTrajectory(gmm_quad_forms)
+        gmmqf_traj.normalize()
+        moments = gmmqf_traj.compute_moments(2)
         n_components = len(gmm_quad_forms[0]._mvn_components)
         traj_components = n_components * [{"weight" : None, "moments" : []}]
         weights = [w for w,_ in gmm_quad_forms[0]._mvn_components]
