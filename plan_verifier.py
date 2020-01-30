@@ -204,18 +204,26 @@ class PlanVerifier(object):
         pool.join()
         return risk_estimates, t_prep, t_risk_assess
 
-    def gmm_quad_form_moments_to_matfile(self, gmm_quad_forms, directory, scenario_number):
+    def gmm_quad_form_moments_to_matfile(self, gmm_quad_forms, max_order, directory, scenario_number):
         gmmqf_traj = GmmQuadFormTrajectory(gmm_quad_forms)
         gmmqf_traj.normalize()
-        moments = gmmqf_traj.compute_moments(2)
+        all_gmm_qf_moments = gmmqf_traj.compute_moments(max_order)
+        all_ground_truth_risks = gmmqf_traj.component_risks("imhof")
+        # Number of components.
         n_components = len(gmm_quad_forms[0]._mvn_components)
-        traj_components = n_components * [{"weight" : None, "moments" : []}]
+        traj_components = n_components * [{"weight" : None, "moments" : [], "ground_truth_risks" : []}]
+
+        # Weights.
         weights = [w for w,_ in gmm_quad_forms[0]._mvn_components]
         for w, component in zip(weights, traj_components):
             component["weight"] = w
-        all_gmm_qf_moments = [gmm_qf.compute_moments(5) for gmm_qf in gmm_quad_forms]
+        
+        # Fill the components with the correct moments.
         for i in range(n_components):
             traj_components[i]["moments"] = [gmm_qf_moments[i] for gmm_qf_moments in all_gmm_qf_moments]
+            traj_components[i]["ground_truth_risks"] = [gmmqf_risks[i] for gmmqf_risks in all_ground_truth_risks]
+
+        # Save results.
         for i, comp in enumerate(traj_components):
             filename = directory + "/" + "position_gmm_component_scenario_" + str(scenario_number) + "_component_" + str(i) + ".mat"
             scipy.io.savemat(filename, comp)

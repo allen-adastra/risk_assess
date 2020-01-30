@@ -222,7 +222,11 @@ class GmmQuadForm(object):
             gmm (instance of MixtureModel with instances of MultivariateNormal as components)
         """
         self._mvn_components = [(prob, MvnQuadForm(A, mvn)) for prob, mvn in zip(gmm.component_probabilities, gmm.component_random_variables)]
-    
+
+    def component_risks(self, t, method, **kwargs):
+        component_risks = [1 - risk for risk in self.component_upper_tail_probs(t, method, **kwargs)]
+        return component_risks
+
     def component_upper_tail_probs(self, t, method, overshoot_one_tolerance = 1e-6, **kwargs):
         """
         Compute the component probabilities:
@@ -269,8 +273,8 @@ class GmmQuadFormTrajectory(object):
         Instead of collision being defined as Q(x) <= 1, we normalize to t * Q(x) <= t
         or t (Q(x) - 1) <= 0 where t is the 1/(max E[Q(x) - 1]) along the trajectory. This allows for
         E[(Q(x) - 1)^n] <= 1 for all time steps, for all components, and for all moments
-        which is important for numerical stability of SOS programs. From wikipedia,
-        t Q(x) = Q(sqrt(t)x), so we just have to scale the MVNs.
+        which is important for numerical stability of SOS programs. From Wikipedia,
+        tQ(x) = Q(sqrt(t)x), so we just have to scale the MVNs.
         """
         expected_value_mvnqfs = []
         for gmm_quad_form in self._gmm_quad_forms:
@@ -288,3 +292,7 @@ class GmmQuadFormTrajectory(object):
         Prob(Q(x) - t <= 0)
         """
         return [gmm_qf.compute_moments(self._t, dmax) for gmm_qf in self._gmm_quad_forms]
+    
+    def component_risks(self, method, overshoot_one_tolerance = 1e-6, **kwargs):
+        # Each list in the list below contains risks for each component.
+        return [gmm_qf.component_risks(self._t, method, **kwargs) for gmm_qf in self._gmm_quad_forms]
