@@ -22,6 +22,8 @@ def chebyshev_bound_halfspace(half_space, moments):
     if E_z > 0:
         variance_x = moments.E2_x - moments.E_x**2
         variance_y = moments.E2_y - moments.E_y**2
+        assert variance_x >= 0.0
+        assert variance_y >= 0.0
         covariance_xy = moments.E_xy - moments.E_x * moments.E_y
         variance_z = (l.a1**2) * variance_x + (l.a2**2) * variance_y + 2 * l.a1 * l.a2 * covariance_xy
         E2_z = variance_z + E_z**2
@@ -97,8 +99,6 @@ class PlanVerifier(object):
         Q[0][0] = 1.0/(self.car_coord_ellipse.a**2)
         Q[1][1] = 1.0/(self.car_coord_ellipse.b**2)
 
-
-
         # Risks at each time step.
         risks = n_steps * [None]
 
@@ -110,10 +110,11 @@ class PlanVerifier(object):
 
             # Each column is a sample [x; y]
             agent_xys = np.vstack((agent_xs[:, i], agent_ys[:, i]))
+            assert agent_xys.shape[0] == 2 # Each column is a sampled position
             change_frame_func = lambda vec : change_frame(vec, ego_vehicle_position, rot_mat)
-            agent_xys = np.apply_along_axis(change_frame_func, 0, agent_xys) # Change the frame of each column
+            agent_xys_frame_changed = np.apply_along_axis(change_frame_func, 0, agent_xys) # Change the frame of each column
             # Evaluate the number of samples for which x'Qx <= 1 (i.e: collides with ellipse)
-            res = (agent_xys.T.dot(Q)*agent_xys.T).sum(axis=1)
+            res = (agent_xys_frame_changed.T.dot(Q)*agent_xys_frame_changed.T).sum(axis=1)
             n_collision = np.argwhere(res <= 1.0).size
             risks[i] = float(n_collision)/float(n_samples)
         t_total = time.time() - t_start
@@ -148,13 +149,13 @@ class PlanVerifier(object):
         t_start = time.time()
         evaluate_component_func = partial(evaluate_component, initial_agent_state, half_space_sets)
         component_probs = pool.map(evaluate_component_func, list(zip(accel_seqs, steer_seqs, weights)))
-        prob_bounds = np.zeros((1, len(component_probs[0])))
+        prob_bounds = len(component_probs[0]) * [0]
         for weight, comp in zip(weights, component_probs):
-            if None in comp:
-                # If Chebyshev bound failed, just return none for now.
-                return None, None
-            prob_bounds += weight * np.asarray(comp)
-        prob_bounds = prob_bounds.tolist()[0]
+            for i, prob in enumerate(comp):
+                if comp[i] == None:
+                    prob_bounds[i] = None
+                if prob_bounds[i] != None:
+                    prob_bounds[i] += weight * comp[i]
         t_total = time.time() - t_start
         pool.close()
         pool.join()

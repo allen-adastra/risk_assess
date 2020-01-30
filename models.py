@@ -94,7 +94,7 @@ def propagate_one_step(state, w_v, w_theta):
 
     new_state.E2_v = E2_v + 2 * E_v * E_wv + E2_wv
 
-    new_state.E_xs = E_v*E_cs*E_cs + E_v*E_sw*E2_c + E_xs*E_cw + E_xc * E_sw
+    new_state.E_xs = E_v*E_cs*E_cw + E_v*E_sw*E2_c + E_xs*E_cw + E_xc * E_sw
 
     new_state.E_ys = E_v*E2_s*E_cw + E_v*E_sw*E_cs + E_ys*E_cw + E_yc * E_sw
 
@@ -154,12 +154,15 @@ class CarState(object):
         self.theta = theta0
 
 class UncontrolledCarState(object):
-    def __init__(self, x0, y0, v0, theta0):
+    def __init__(self, x0, y0, v0, theta0, numerical_padding = 1e-6):
+        """
+        numerical_padding is to prevent negative variance
+        """
         self.E_x = x0
         self.E_y = y0
         self.E_xy = x0 * y0
-        self.E2_x = x0**2
-        self.E2_y = y0**2
+        self.E2_x = x0**2 + numerical_padding
+        self.E2_y = y0**2 + numerical_padding
         self.E_xvs = x0 * v0 * math.sin(theta0)
         self.E_xvc = x0 * v0 * math.cos(theta0)
         self.E_yvs = y0 * v0 * math.sin(theta0)
@@ -169,7 +172,7 @@ class UncontrolledCarState(object):
         self.E_ys = y0 * math.sin(theta0)
         self.E_yc = y0 * math.cos(theta0)
         self.E_v = v0
-        self.E2_v = v0**2
+        self.E2_v = v0**2 + numerical_padding
         self.theta = SumOfRVs(theta0, [])
     
     def speed_scaled(self, speed_scale_factor):

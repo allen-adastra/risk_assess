@@ -562,6 +562,7 @@ class CosSumOfRVs(RandomVariable):
         # If there are no random variables, this is just a constant.
         if len(self.random_variables) == 0:
             return math.cos(self.c)**order
+
         if order not in self._moment_values.keys():
             if order == 1:
                 return np.real(self.compute_characteristic_function(1))
@@ -572,10 +573,10 @@ class CosSumOfRVs(RandomVariable):
                 real_component = [np.real(val) for val in char_fun_values]
                 # Different expressions depending on if the order is odd or even
                 if order % 2 == 0:
-                    summation = sum([comb(order, k) * real_component[2 * (n - k)] for k in range(n)])
-                    self._moment_values[order] = (1.0/(2.0**(2.0 * n))) * comb(order, n) + (1.0/(2.0**(2.0 * n - 1))) * summation
+                    summation = sum([comb(2 * n, k, exact = True) * real_component[2 * (n - k)] for k in range(n)])
+                    self._moment_values[order] = (1.0/(2.0**(2.0 * n))) * comb(2 * n, n, exact = True) + (1.0/(2.0**(2.0 * n - 1))) * summation
                 elif order % 2 == 1:
-                    summation = sum([comb(2 * n + 1, k) * real_component[2 * n + 1 - 2 * k] for k in range(n + 1)])
+                    summation = sum([comb(2 * n + 1, k, exact = True) * real_component[2 * n + 1 - 2 * k] for k in range(n + 1)])
                     self._moment_values[order] = (1.0/(4.0**n)) * summation
                 else:
                     raise Exception("Input order mod 2 is neither 0 nor 1")
@@ -592,6 +593,7 @@ class CosSumOfRVs(RandomVariable):
         And we have some constant c, then this function computes the characteristic function of
         c + w_1 + ... + w_n
         """
+        assert len(self.random_variables) > 0
         if t not in self._char_fun_values.keys():
             self._char_fun_values[t] = cmath.exp(complex(0, t * self.c)) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
         return self._char_fun_values[t]
@@ -630,10 +632,10 @@ class SinSumOfRVs(RandomVariable):
                 imaginary_component = [np.imag(val) for val in char_fun_values]
                 # Different expressions depending on if the order is odd or even
                 if order % 2 == 0:
-                    summation = sum([((-1)**k) * comb(order, k) * real_component[2 * (n - k)] for k in range(n)])
-                    self._moment_values[order] = (1.0/(2.0**(2.0 * n))) * comb(order, n) + (((-1)**n)/ (2**(2 * n - 1))) * summation
+                    summation = sum([((-1)**k) * comb(2 * n, k, exact = True) * real_component[2 * (n - k)] for k in range(n)])
+                    self._moment_values[order] = (1.0/(2.0**(2.0 * n))) * comb(2 * n, n, exact = True) + (((-1)**n)/ (2**(2 * n - 1))) * summation
                 elif order % 2 == 1:
-                    summation = sum([((-1)**k) * comb(order, k) * imaginary_component[2 * n + 1 - 2 * k] for k in range(n+1)])
+                    summation = sum([((-1)**k) * comb(2 * n + 1, k, exact = True) * imaginary_component[2 * n + 1 - 2 * k] for k in range(n+1)])
                     self._moment_values[order] = (((-1)**n)/(4**n)) * summation
                 else:
                     raise Exception("Input order mod 2 is neither 0 nor 1")
@@ -650,6 +652,7 @@ class SinSumOfRVs(RandomVariable):
         And we have some constant c, then this function computes the characteristic function of
         c + w_1 + ... + w_n
         """
+        assert len(self.random_variables) > 0
         if t not in self._char_fun_values.keys():
             self._char_fun_values[t] = cmath.exp(complex(0, t * self.c)) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
         return self._char_fun_values[t]
@@ -686,6 +689,7 @@ class CrossSumOfRVs(RandomVariable):
         And we have some constant c, then this function computes the characteristic function of
         c + w_1 + ... + w_n
         """
+        assert len(self.random_variables) > 0
         if t not in self._char_fun_values.keys():
             self._char_fun_values[t] =  cmath.exp(complex(0, t * self.c)) * np.prod([rv.compute_characteristic_function(t) for rv in self.random_variables])
         return self._char_fun_values[t]

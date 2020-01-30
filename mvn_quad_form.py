@@ -99,6 +99,7 @@ class MvnQuadForm(object):
         Sigma = self._Sigma_x
         samples = np.random.multivariate_normal(mu_x.flatten(), Sigma, int(n_samples))
         samples = samples.T # 2 x n_samples array
+        assert samples.shape[0] == 2
         res = (samples.T.dot(A)*samples.T).sum(axis=1)
         n_true = np.argwhere(res > t).size
         return float(n_true)/float(n_samples)
