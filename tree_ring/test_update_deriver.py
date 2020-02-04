@@ -2,6 +2,8 @@ from update_derivier import *
 import sympy as sp
 import networkx as nx
 
+big_number = 10000
+
 class TestThing(object):
     def setup(self):
         # Declare variables at time "t"
@@ -17,14 +19,14 @@ class TestThing(object):
         cos_wthetat = sp.cos(wthetat)
 
         # Initialize base variables.
-        self._xt = BaseVariable(xt, 1,  xt + vt * cos_thetat)
-        self._yt = BaseVariable(yt, 1, yt + vt * sin_thetat)
-        self._vt = BaseVariable(vt, 2, vt + wvt)
-        self._sin_thetat = BaseVariable(sin_thetat, float("inf"), sp.expand_trig(sp.sin(thetat + wthetat)))
-        self._cos_thetat = BaseVariable(cos_thetat, float("inf"), sp.expand_trig(sp.cos(thetat + wthetat)))
-        self._sin_wthetat = BaseVariable(sin_wthetat, float("inf"), None)
-        self._cos_wthetat = BaseVariable(cos_wthetat, float("inf"), None)
-        self._wvt = BaseVariable(wvt, float("inf"), None)
+        self._xt = BaseVariable(xt, {1},  xt + vt * cos_thetat)
+        self._yt = BaseVariable(yt, {1}, yt + vt * sin_thetat)
+        self._vt = BaseVariable(vt, {1, 2}, vt + wvt)
+        self._sin_thetat = BaseVariable(sin_thetat, set(range(big_number)), sp.expand_trig(sp.sin(thetat + wthetat)))
+        self._cos_thetat = BaseVariable(cos_thetat, set(range(big_number)), sp.expand_trig(sp.cos(thetat + wthetat)))
+        self._sin_wthetat = BaseVariable(sin_wthetat, set(range(big_number)), None)
+        self._cos_wthetat = BaseVariable(cos_wthetat, set(range(big_number)), None)
+        self._wvt = BaseVariable(wvt, set(range(big_number)), None)
 
         self._base_variables = [self._xt, self._yt, self._vt, self._sin_thetat, self._cos_thetat, self._sin_wthetat, self._cos_wthetat, self._wvt]
 
