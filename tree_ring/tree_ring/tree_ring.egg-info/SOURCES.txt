@@ -1,8 +1,0 @@
-README.md
-setup.py
-systems/__init__.py
-systems/uncontrolled_agent.py
-tree_ring.egg-info/PKG-INFO
-tree_ring.egg-info/SOURCES.txt
-tree_ring.egg-info/dependency_links.txt
-tree_ring.egg-info/top_level.txt
