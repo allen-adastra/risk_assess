@@ -1,18 +1,30 @@
 import sympy as sp
 import networkx as nx
-import time
 import numpy as np
 from objects import BaseVariable, DerivedVariable
 
-def generate_higher_degree_update_relation(variable, degree, base_variables):
-  """
-  Args:
-    variable (instance of BaseVariable)
-    degree
-    base_variables 
-  """
-  expression = variable.update_relation**degree
-  return generate_new_update_relation(expression, base_variables)
+def tree_ring(var_power_map, base_variables, dependence_graph, derived_variables, max_iters = 100):
+    """
+    NOTE (02/04/2020): Currently, this is not implemented recursively as described in the RSS paper.
+    Args:
+        poly_to_check (Sympy variable in)
+        base_variables (Set of instances of BaseVariable)
+        dependence_graph (NetworkX Graph)
+        derived_variables (Set of instances of DerivedVariable)
+    """
+    var_power_maps_to_expand = [var_power_map]
+    base_variables_sympy = [var.sympy_rep for var in base_variables]
+    i = 0 # Keep track of iteratios 
+    while var_power_maps_to_expand and i < max_iters:
+        new_map_to_expand = var_power_maps_to_expand.pop()
+        new_derived_variable = generate_new_update_relation(new_map_to_expand, base_variables)
+        derived_variables.add(new_derived_variable)
+        new_var_power_maps = check_polynomial(sp.poly(new_derived_variable.update_relation, base_variables_sympy), base_variables, dependence_graph, derived_variables)
+        var_power_maps_to_expand += new_var_power_maps
+        i+=1
+    
+    if i >= max_iters:
+        raise Exception("Exceeded maximum number of iterations.")
 
 def generate_new_update_relation(variable_power_mapping, base_variables):
     """
@@ -22,7 +34,8 @@ def generate_new_update_relation(variable_power_mapping, base_variables):
         base_variables (List of instances of BaseVariable): base variables of the polynomial system. 
     """
     # All base variables in the mapping should have non-zero power.
-    assert min(variable_power_mapping.values()) > 0 
+    #assert min(variable_power_mapping.values()) > 0
+    variable_power_mapping = {var : power for var, power in variable_power_mapping.items() if power != 0}
 
     # Derive the new relation.
     variable_expansions = [var.update_relation**power for var, power in variable_power_mapping.items()]
@@ -43,6 +56,8 @@ def check_polynomial(poly_to_check, base_variables, dependence_graph, derived_va
         base_variables (list of instances of BaseVariable): 
         dependence_graph (networkX graph): This is the Variable Dependency Graph; its nodes consist of base_variables
         derived_variables (list of instances of DerivedVariable): All of the instances of DerivedVariable created thus far.
+    Returns:
+
     """
     new_variables_to_derive = []
     for multi_index in poly_to_check.monoms():
@@ -88,15 +103,3 @@ def check_polynomial(poly_to_check, base_variables, dependence_graph, derived_va
             if variable_power_mapping[var] not in var.computable_moments:
                 new_variables_to_derive.append({var : variable_power_mapping[var]})
     return new_variables_to_derive
-
-def test_iterate(poly_to_check, base_variables, dependence_graph, derived_variables, max_iters = 100):
-    base_variables_sympy = [var.sympy_rep for var in base_variables]
-    things_to_expand = check_polynomial(poly_to_check, base_variables, dependence_graph, derived_variables)
-    i = 0
-    while things_to_expand and i < max_iters:
-        thing = things_to_expand.pop()
-        new_derived_variable = generate_new_update_relation(thing, base_variables)
-        derived_variables.add(new_derived_variable)
-        new_stuff_to_expand = check_polynomial(sp.poly(new_derived_variable.update_relation, base_variables_sympy), base_variables, dependence_graph, derived_variables)
-        things_to_expand += new_stuff_to_expand
-        i+=1
