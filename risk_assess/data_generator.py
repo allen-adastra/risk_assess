@@ -1,7 +1,7 @@
 from scipy import random
 import numpy as np
-from random_objects import *
-from mvn_quad_form import *
+from risk_assess.random_objects.random_variables import *
+from risk_assess.random_objects.quad_forms import *
 
 def random_psd_matrix(n):
     """
