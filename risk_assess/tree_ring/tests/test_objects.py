@@ -1,6 +1,6 @@
 import pytest
-import tree_ring.objects as tro
-from tree_ring.systems.uncontrolled_agent import UncontrolledAgent
+import risk_assess.tree_ring.objects as tro
+from risk_assess.tree_ring.systems.uncontrolled_agent import UncontrolledAgent
 
 def f():
     raise SystemExit(1)

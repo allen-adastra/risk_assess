@@ -1,7 +1,7 @@
 import sympy as sp
 import networkx as nx
 import numpy as np
-from tree_ring.objects import BaseVariable, DerivedVariable
+from risk_assess.tree_ring.objects import BaseVariable, DerivedVariable
 
 def tree_ring(var_power_map, base_variables, dependence_graph, derived_variables, max_iters = 100):
     """

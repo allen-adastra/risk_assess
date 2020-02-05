@@ -1,0 +1,5 @@
+{
+  "risk_assess/random_objects_test.py": true, 
+  "risk_assess/tree_ring/tests/test_objects.py::test_eq_hash": true, 
+  "risk_assess/tree_ring/tests/test_objects.py::test_mytest": true
+}

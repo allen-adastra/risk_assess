@@ -1,5 +1,5 @@
-from tree_ring import *
-import tree_ring.objects as tro
+from risk_assess.tree_ring import *
+import risk_assess.tree_ring.objects as tro
 import sympy as sp
 import networkx as nx
 

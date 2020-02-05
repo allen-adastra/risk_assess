@@ -1,5 +1,5 @@
-from tree_ring.tree_ring import tree_ring
-from tree_ring.systems.uncontrolled_agent import UncontrolledAgent
+from risk_assess.tree_ring.tree_ring import tree_ring
+from risk_assess.tree_ring.systems.uncontrolled_agent import UncontrolledAgent
 import sympy as sp
 import networkx as nx
 
