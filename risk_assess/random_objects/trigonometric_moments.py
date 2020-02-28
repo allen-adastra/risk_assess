@@ -2,7 +2,7 @@ from itertools import accumulate
 import numpy as np
 import math
 import cmath
-from scipy.special import hyp1f1, comb
+from scipy.special import comb
 from scipy.stats import norm, ncx2, chi2
 from risk_assess.random_objects.random_variables import RandomVariable
 
@@ -26,7 +26,6 @@ class SumOfRVs(object):
 
     def add_rv(self, rv):
         self.random_variables.append(rv)
-
 
 """
 Let x1, x2, ..., xn be n independent random variables and c be some constant.

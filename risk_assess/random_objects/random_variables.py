@@ -1,6 +1,7 @@
 import numpy as np
 import cmath
-from scipy.stats import norm, hyp1f1
+from scipy.stats import norm
+from scipy.special import hyp1f1
 from itertools import accumulate
 
 def is_diag(M):
@@ -58,8 +59,8 @@ class Normal(RandomVariable):
             self._char_fun_values[t] = cmath.exp(complex(-0.5 * self._variance * t**2, self._mean * t))
         return self._char_fun_values[t]
     
-    def sample(self):
-        return np.random.normal(self._mean, self._variance**0.5)
+    def sample(self, n_samps):
+        return np.random.normal(self._mean, self._variance**0.5, size = (n_samps, 1))
     
     def scale(self, scale_factor):
         self._mean *= scale_factor

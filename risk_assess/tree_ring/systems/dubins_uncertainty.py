@@ -4,7 +4,7 @@ import sympy as sp
 import networkx as nx
 
 big_number = 10000
-class UncontrolledAgent(object):
+class DubinsUncertainty(object):
     def __init__(self):
         # Declare variables at time "t"
         xt = sp.Symbol("x_t")
@@ -12,6 +12,8 @@ class UncontrolledAgent(object):
         vt = sp.Symbol("v_t")
         wvt = sp.Symbol("w_{v_t}")
         wthetat = sp.Symbol("w_{theta_t}")
+        wxt = sp.Symbol("w_{x_t}")
+        wyt = sp.Symbol("w_{y_t}")
         thetat = sp.Symbol("theta_t")
         cos_thetat = sp.cos(thetat)
         sin_thetat = sp.sin(thetat)
@@ -27,8 +29,10 @@ class UncontrolledAgent(object):
         self._sin_wthetat = tro.BaseVariable(sin_wthetat, set(range(big_number)), None)
         self._cos_wthetat = tro.BaseVariable(cos_wthetat, set(range(big_number)), None)
         self._wvt = tro.BaseVariable(wvt, set(range(big_number)), None)
+        self._wxt = tro.BaseVariable(wxt, set(range(big_number)), None)
+        self._wyt = tro.BaseVariable(wyt, set(range(big_number)), None)
 
-        self._base_variables = [self._xt, self._yt, self._vt, self._sin_thetat, self._cos_thetat, self._sin_wthetat, self._cos_wthetat, self._wvt]
+        self._base_variables = [self._xt, self._yt, self._vt, self._sin_thetat, self._cos_thetat, self._sin_wthetat, self._cos_wthetat, self._wvt, self._wxt, self._wyt]
 
         self._variable_dependence_graph = nx.Graph()
         self._variable_dependence_graph.add_nodes_from(self._base_variables)

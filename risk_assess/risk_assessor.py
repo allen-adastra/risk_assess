@@ -1,9 +1,10 @@
-from plan_verification.geom_utils import Ellipse, rotation_matrix, change_frame
-from plan_verification.models import simulate_deterministic, propagate_moments
+from risk_assess.geom_utils import Ellipse, rotation_matrix, change_frame
+from risk_assess.deterministic import simulate_deterministic
+from risk_assess.uncertain_agent.moment_dynamics import propagate_moments
+from risk_assess.random_objects.quad_forms import GmmQuadForm
 import numpy as np
 import math
 import time
-from plan_verification.mvn_quad_form import GmmQuadForm
 from copy import copy, deepcopy
 import multiprocessing
 from functools import partial
@@ -13,7 +14,7 @@ def chebyshev_bound_halfspace(half_space, moments):
     """
     Args:
         half_space: instance of HalfSpace
-        moments: instance of UncontrolledCarState
+        moments: instance of AgentMomentState
     In this function, we think of the random variable z = a1 * x + a2 * y + b
     """
     l = half_space.line
@@ -45,16 +46,14 @@ def evaluate_component(initial_agent_state, half_space_sets, input):
             component_probs[i] = None
     return component_probs
 
-def evalute_gmm_quad_form(kwargs, method, gmm_quad_form):
-    return 1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs)
-
-class PlanVerifier(object):
+class RiskAssessor(object):
     def __init__(self, xs, ys, vs, thetas, car_coord_ellipse):
         """
         Args:
-            initial_state: instance of CarState
-            accels: deterministic control sequence for the ego vehicle
-            steers: deterministic control sequence for the ego vehicle
+            xs : sequence of x positions
+            ys : seqeunce of y positions
+            vs : sequence of speeds
+            thetas : sequence of headings in the global frame
             car_coord_ellipse: instance of Ellipse defining an ellipse in the cars coordinates. x_center, y_center, and theta should be zero.
         """
         self.xs = xs
@@ -66,7 +65,7 @@ class PlanVerifier(object):
     def generate_ellipses(self, car_coord_ellipse):
         """
         Given an ellipse described in the car coordinates, generate
-        ellipses in the global frame
+        ellipses parameterized in the global frame.
         """
         cce = car_coord_ellipse
         ellipses = len(self.xs) * [None]
@@ -77,8 +76,7 @@ class PlanVerifier(object):
             ellipses[i] = Ellipse(cce.a, cce.b, x + cce.x_center, y + cce.y_center, t + cce.theta)
         return ellipses
 
-
-    def assess_risk_monte_carlo(self, gmm_control_sequence, x0, y0, v0, theta0, n_samples, dt):
+    def control_assess_risk_monte_carlo(self, gmm_control_sequence, x0, y0, v0, theta0, n_samples, dt):
         """
         Args:
             gmm_control_sequence (instance of GmmControlSequence)
@@ -89,7 +87,7 @@ class PlanVerifier(object):
 
         # Sample control sequences and propagate them into states.
         accel_samps, steer_samps = gmm_control_sequence.sample(n_samples)
-        agent_xs, agent_ys, agent_vs, thetas = simulate_deterministic(x0, y0, v0, theta0, accel_samps, steer_samps, dt)
+        agent_xs, agent_ys, _, _ = simulate_deterministic(x0, y0, v0, theta0, accel_samps, steer_samps, dt)
 
         # Propagating controls introduces "extra steps". Limit ourselves to this number of steps.
         n_steps = len(self.xs) - 2
@@ -120,7 +118,7 @@ class PlanVerifier(object):
         t_total = time.time() - t_start
         return risks, agent_xs, agent_ys, t_total
 
-    def assess_risk_chebyshev_halfspace(self, gmm_control_sequence, initial_agent_state, n_lines, dt):
+    def control_assess_risk_chebyshev_halfspace(self, gmm_control_sequence, initial_agent_state, n_lines, dt):
         accel_seqs = deepcopy(gmm_control_sequence.array_rep["accels"])
         steer_seqs = deepcopy(gmm_control_sequence.array_rep["steers"])
         weights = gmm_control_sequence.array_rep["weights"]
@@ -190,19 +188,11 @@ class PlanVerifier(object):
         Returns:
             list of risks associated to the GMMs.
         """
-        tstart_prep = time.time()
         gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj)
-        if "scenario_number" in kwargs.keys():
-            self.gmm_quad_form_moments_to_matfile(gmm_quad_forms, "/home/allen/plan_verification_rss_2020/plan_verification/sos_risk_assessment/data", kwargs["scenario_number"])
-        pool = multiprocessing.Pool()
-        time_step_func = partial(evalute_gmm_quad_form, kwargs, method)
-        t_prep = time.time() - tstart_prep
         tstart_risk_estimate = time.time()
         risk_estimates = [1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) for gmm_quad_form in gmm_quad_forms]
         t_risk_assess = time.time() - tstart_risk_estimate
-        pool.close()
-        pool.join()
-        return risk_estimates, t_prep, t_risk_assess
+        return risk_estimates, t_risk_assess
 
     def gmm_quad_form_moments_to_matfile(self, gmm_quad_forms, directory, scenario_number):
         n_components = len(gmm_quad_forms[0]._mvn_components)
