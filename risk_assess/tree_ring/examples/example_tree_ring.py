@@ -59,5 +59,5 @@ class TestDubin(DubinsUncertainty):
         self.print_derived_relations()
 
 
-test = TestDubin()
+test = TestUncontrolledAgent()
 test.test_max_order_2()
