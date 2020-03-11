@@ -6,3 +6,4 @@ sos_risk_assessment/data
 *.egg-info/
 .installed.cfg
 *.egg
+build/
