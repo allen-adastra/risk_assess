@@ -80,6 +80,9 @@ class cBetaRandomVariable(RandomVariable):
         self._char_fun_values = {}
         self._moment_values = {}
 
+    def compute_moment(self, order):
+        return self.compute_moments(order)[order]
+
     def compute_moments(self, order):
         """
         Compute all beta moments up to the given order. The returned list indices should match the moment orders
@@ -90,8 +93,8 @@ class cBetaRandomVariable(RandomVariable):
         cbeta = [beta[i]*self.c**i for i in range(len(beta))]
         return cbeta
 
-    def sample(self):
-        return self.c * np.random.beta(self.alpha, self.beta)
+    def sample(self, n_samps):
+        return self.c * np.random.beta(self.alpha, self.beta, size = (n_samps, 1))
 
     def compute_characteristic_function(self, t):
         """
