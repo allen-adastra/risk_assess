@@ -13,6 +13,8 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
+import time
+
 def linear_system(v0, theta0, dt):
     # State vector: [x, y, theta, v]^T
     # Control vector: [wtheta, wv]
@@ -107,7 +109,7 @@ def run():
     n_step = 30
     n_samps = int(1e5)
     dt = 1
-    initial_state = AgentMomentState.from_deterministic_state(x0 = 0.0, y0 = 0.0, v0 = 5.0, theta0 = 0.0)
+    initial_state = AgentMomentState.from_deterministic_state(x0 = 0.0, y0 = 0.0, v0 = 0.5, theta0 = 0.0)
 
     # Construct random variables.
     wvs = n_step * [cBetaRandomVariable(10, 1000, 1)]
