@@ -4,7 +4,6 @@ import scipy.linalg as sla
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 import math
-import sympy as sp
 stats = importr('stats')
 cqf = importr('CompQuadForm')
 
@@ -142,7 +141,6 @@ class MvnQuadForm(object):
         if out['abserr'][0] > 2 * eps_abs:
             print("Warning! The absolute error is %.3E which is more than double the absolute error tolerance" % out['abserr'][0])
         return out['Qq'][0]
-
 
     def upper_tail_probability(self, t, method, **kwargs):
         """

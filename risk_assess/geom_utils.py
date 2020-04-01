@@ -82,6 +82,19 @@ class Ellipse(object):
         self.a_sq = self.a ** 2
         self.a_sq_b_sq = self.b_sq * self.a_sq
     
+    @classmethod
+    def from_matrix(cls, Q):
+        """
+        Assume ellipse is defined by the set:
+            {x : x'Qx <= 1}
+        """
+        semi_major = 1.0/(Q[0][0]**0.5)
+        semi_minor = 1.0/(Q[1][1]**0.5)
+        h = 0.0
+        k = 0.0
+        theta = 0.0
+        return cls(semi_major, semi_minor, h, k, theta)
+    
     def generate_tangent_lines(self, ts, test = False):
         """
         Given a list of angle parameters, compute the corresponding point on the ellipse

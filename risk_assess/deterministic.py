@@ -8,6 +8,30 @@ class CarState(object):
     v: float
     theta: float
 
+class Trajectory(object):
+    def __init__(self, xs, ys, vs, thetas):
+        self._x = xs
+        self._y = ys
+        self._v = vs
+        self._theta = thetas
+    
+    @property
+    def x(self):
+        return self._x
+
+    @property
+    def y(self):
+        return self._y
+    
+    @property
+    def v(self):
+        return self._v
+    
+    @property
+    def theta(self):
+        return self._theta
+
+
 def simulate_deterministic(x0, y0, v0, theta0, accels, steers, dt):
     """
     Given an initial state and control sequences, forward simulate and return future states.
