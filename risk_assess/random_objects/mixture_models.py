@@ -38,6 +38,9 @@ class MixtureModel(RandomVariable):
         # the variable chosen.
         mode_idx = list(np.random.multinomial(1, self.component_probabilities)).index(1)
         return self.component_random_variables[mode_idx].sample()
+    
+    def get_components(self):
+        return [(w, rv) for w, rv in zip(self.component_probabilities, self.component_random_variables)]
 
 class GMM(MixtureModel):
     """

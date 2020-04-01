@@ -21,6 +21,9 @@ class GmmTrajectory(object):
     
     def __len__(self):
         return len(self._gmms)
+    
+    def __getitem__(self,index):
+         return self._gmms[index]
 
     @property
     def array_rep(self):
@@ -30,6 +33,32 @@ class GmmTrajectory(object):
     @property
     def gmms(self):
         return self._gmms
+
+    @property
+    def mean_trajectories(self):
+        return self._mean_trajectories
+
+    @property
+    def covariance_trajectories(self):
+        return self._covariance_trajectories
+
+    @classmethod
+    def from_sequences(cls, weights, sequences):
+        """
+        Args:
+            weights (list of floats): component mixture weights
+            sequences (list of lists of instances of MultivariateNormal): [[seq1], [seq2], ....] each [seqi] is a list of instances of MultivariateNormal
+        """
+        n_mixture = len(weights)
+        n_steps = len(sequences[0])
+        gmms = n_steps * [None]
+        for step in range(n_steps):
+            mixture_components = n_mixture * [None]
+            for mixture in range(n_mixture):
+                mixture_components[mixture] = (weights[mixture], sequences[mixture][step])
+            gmms[step] = GMM(mixture_components)
+        gmm_traj = cls(gmms)
+        return gmm_traj
 
     @classmethod
     def from_prediction(cls, prediction, scale_k):
