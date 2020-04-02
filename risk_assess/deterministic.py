@@ -1,13 +1,6 @@
 import numpy as np
 from dataclasses import dataclass
 
-@dataclass
-class CarState(object):
-    x: float
-    y: float
-    v: float
-    theta: float
-
 class Trajectory(object):
     def __init__(self, xs, ys, vs, thetas):
         self._x = xs

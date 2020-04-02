@@ -189,10 +189,8 @@ class RiskAssessor(object):
             list of risks associated to the GMMs.
         """
         gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj)
-        tstart_risk_estimate = time.time()
         risk_estimates = [1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) for gmm_quad_form in gmm_quad_forms]
-        t_risk_assess = time.time() - tstart_risk_estimate
-        return risk_estimates, t_risk_assess
+        return risk_estimates
 
     def gmm_quad_form_moments_to_matfile(self, gmm_quad_forms, directory, scenario_number):
         n_components = len(gmm_quad_forms[0]._mvn_components)
