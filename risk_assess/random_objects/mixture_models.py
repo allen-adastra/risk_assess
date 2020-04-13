@@ -15,6 +15,9 @@ class MixtureModel(RandomVariable):
         self._char_fun_values = {}
         self._moment_values = {}
 
+    def __getitem__(self,index):
+         return (self.component_probabilities[index], self.component_random_variables[index])
+
     def compute_moment(self, order):
         if order not in self._moment_values.keys():
             moment = 0
