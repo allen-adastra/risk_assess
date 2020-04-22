@@ -161,9 +161,6 @@ class MvnQuadForm(object):
         else:
             raise NotImplementedError("Invalid method name.")
     
-###################################################
-# Stuff for farming moments to send off to MATLAB.
-###################################################
     def compute_moments(self, t, dmax):
         """
         Compute the moments of Q(x) - t so that the Chebshev and SOS techniques can be used for
@@ -180,7 +177,7 @@ class MvnQuadForm(object):
             return 1
         elif d == 1:
             # https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
-            return np.trace(self._A @ self._Sigma_x) + (self._mu_x.T @ (self._A @ self._mu_x))[0][0] - t
+            return np.trace(self._A @ self._Sigma_x) + (self._mu_x.T @ self._A @ self._mu_x)[0][0] - t
         elif d == 2:
             # https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
             # Note: variance is invariant under translation, so we don't worry about the -1 component.
@@ -191,6 +188,7 @@ class MvnQuadForm(object):
             variance = 2 * np.trace(A_mat @ self._Sigma_x @ A_mat @ self._Sigma_x) + 4 * self._mu_x.T @ A_mat @ self._Sigma_x @ A_mat @ self._mu_x
             return variance[0][0] + self.compute_moment(t, 1)**2
         elif d > 2:
+            raise Warning("Using monte carlo to compute moments.")
             return self.monte_carlo_moments(t, d)
 
     def monte_carlo_moments(self, t, d, n_samples = 1e6):
@@ -243,9 +241,8 @@ class GmmQuadForm(object):
         assert upper_tail_prob < 1.0 + overshoot_one_tolerance
         return min(upper_tail_prob, 1.0)
     
-    def compute_moments(self, t, dmax):
+    def compute_moment(self, t, d):
         """
-        Compute the moments of Q(x) - t so that the Chebshev and SOS techniques can be used for
-        estimating Prob(Q(x) - t <= 0).
+        Compute the dth moment of Q(x) - t.
         """
-        return [mvnqf.compute_moments(t, dmax) for w, mvnqf in self._mvn_components]
+        return sum([w * mvnqf.compute_moment(t, d) for w, mvnqf in self._mvn_components])

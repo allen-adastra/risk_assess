@@ -1,7 +1,10 @@
 import numpy as np
 from risk_assess.random_objects.random_variables import MultivariateNormal
 from risk_assess.random_objects.mixture_models import GMM
+from risk_assess.random_objects.quad_forms import GmmQuadForm
+from risk_assess.geom_utils import rotation_matrix
 import scipy.io
+from copy import deepcopy
 
 """
 A sequence of Gaussian Mixture Models (GMMs) that represent a predicted agent trajectory.
@@ -89,6 +92,29 @@ class GmmTrajectory(object):
             gmms.append(GMM(mixture_components))
         gmm_traj = cls(gmms)
         return gmm_traj
+
+    def generate_gmm_quad_forms(self, xs, ys, thetas, Q):
+        """
+        Given an ego vehicle plan represented by a sequence of poses and the parameters
+        of the ellipse around the ego vehicle, generate a GmmQuadForm at each time step.
+        Args:
+            xs ([type]): ego vehicle x
+            ys ([type]): ego vehicle y
+            thetas ([type]): ego vehicle heading
+            Q (2x2 numpy array) : matrix defining the collision ellipse
+        Returns:
+            [type]: [description]
+        """
+        gmms = self._gmms
+        gmm_quad_forms = len(gmms) * [None]
+        for i in range(len(gmms)):
+            ego_vehicle_position = np.array([[xs[i]],
+                                             [ys[i]]])
+            rot_mat = rotation_matrix(-thetas[i])
+            gmm = deepcopy(gmms[i])
+            gmm.change_frame(ego_vehicle_position, rot_mat)
+            gmm_quad_forms[i] = GmmQuadForm(Q, gmm)
+        return gmm_quad_forms
 
     def check_consistency(self):
         # First check that the number of components for each GMM is the same.

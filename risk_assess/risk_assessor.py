@@ -2,6 +2,7 @@ from risk_assess.geom_utils import Ellipse, rotation_matrix, change_frame
 from risk_assess.deterministic import simulate_deterministic
 from risk_assess.uncertain_agent.moment_dynamics import propagate_moments
 from risk_assess.random_objects.quad_forms import GmmQuadForm
+from risk_assess.concentration_inequalities import *
 import numpy as np
 import math
 import time
@@ -159,27 +160,7 @@ class RiskAssessor(object):
         pool.join()
         return prob_bounds, t_total
 
-    def prepare_gmm_quad_forms(self, gmm_traj):
-        gmms = gmm_traj.gmms
-        Q = np.zeros((2, 2))
-        Q[0][0] = 1.0/(self.car_coord_ellipse.a**2)
-        Q[1][1] = 1.0/(self.car_coord_ellipse.b**2)
-        gmm_quad_forms = len(gmms) * [None]
-        for i in range(len(gmms)):
-            ego_vehicle_position = np.array([[self.xs[i]],
-                                             [self.ys[i]]])
-            rot_mat = rotation_matrix(-self.thetas[i])
-            gmm = deepcopy(gmms[i])
-            gmm.change_frame(ego_vehicle_position, rot_mat)
-            gmm_quad_forms[i] = GmmQuadForm(Q, gmm)
-        return gmm_quad_forms
-
-    def assess_risk_gmms_component(self, gmm_traj, method, component_number, **kwargs):
-        gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj)
-        risk_estimates = [1 - gmm_quad_form.component_upper_tail_probs(1, method, **kwargs)[component_number] for gmm_quad_form in gmm_quad_forms]
-        return risk_estimates
-
-    def assess_risk_gmms(self, gmm_traj, method, **kwargs):
+    def assess_risk_gmms(self, gmm_quad_forms, method, **kwargs):
         """
         Given a list of gaussian mixture models (GMMs) assess the risk of this plan
         Args:
@@ -188,9 +169,29 @@ class RiskAssessor(object):
         Returns:
             list of risks associated to the GMMs.
         """
-        gmm_quad_forms = self.prepare_gmm_quad_forms(gmm_traj)
         risk_estimates = [1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) for gmm_quad_form in gmm_quad_forms]
         return risk_estimates
+
+    def assess_risk_gmms_conc(self, gmm_quad_forms, inequality):
+        """
+        Args:
+            gmm_traj ([type]): [description]
+            inequality (ConcentrationInequality): [description]
+        """
+        if inequality == ConcentrationInequality.CANTELLI:
+            inequality_func = cantelli
+        elif inequality == ConcentrationInequality.VP:
+            inequality_func = vp
+        elif inequality == ConcentrationInequality.GAUSS:
+            inequality_func = gauss
+        else: 
+            raise Exception("Invalid concentration inequality type.")
+        first_moments = [gmm_qf.compute_moment(1, 1) for gmm_qf in gmm_quad_forms]
+        second_moments = [gmm_qf.compute_moment(1, 2) for gmm_qf in gmm_quad_forms]
+        variances = [second - first**2.0 for first, second in zip(first_moments, second_moments)]
+        risk_bounds = [inequality_func(mean, var) for mean, var in zip(first_moments, variances)]
+        return risk_bounds
+
 
     def gmm_quad_form_moments_to_matfile(self, gmm_quad_forms, directory, scenario_number):
         n_components = len(gmm_quad_forms[0]._mvn_components)
