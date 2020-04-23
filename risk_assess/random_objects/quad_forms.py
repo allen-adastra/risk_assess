@@ -87,7 +87,7 @@ class MvnQuadForm(object):
             A: positive definite matrix as described above.
             mvn: instance of MultivariateNormal
         """
-        self._A = A
+        self._A = np.copy(A)
         self._mu_x = mvn.mean
         self._Sigma_x = mvn.covariance
         self._mvn = mvn
@@ -214,7 +214,7 @@ class GmmQuadForm(object):
             A (numpy array): as defined
             gmm (instance of MixtureModel with instances of MultivariateNormal as components)
         """
-        self._mvn_components = [(prob, MvnQuadForm(A, mvn)) for prob, mvn in zip(gmm.component_probabilities, gmm.component_random_variables)]
+        self._mvn_components = [(prob, MvnQuadForm(np.copy(A), mvn)) for prob, mvn in zip(gmm.component_probabilities, gmm.component_random_variables)]
     
     def component_upper_tail_probs(self, t, method, overshoot_one_tolerance = 1e-6, **kwargs):
         """

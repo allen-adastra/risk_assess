@@ -2,6 +2,7 @@ import numpy as np
 import cmath
 from scipy.stats import norm
 from scipy.special import hyp1f1
+from itertools import accumulate
 
 def is_diag(M):
     i, j = np.nonzero(M)
@@ -69,40 +70,40 @@ class Normal(RandomVariable):
 
 # """cbeta is the beta distribution multiplied by a constant. When c = 1, this
 # is just a normal beta random variable."""
-# class cBetaRandomVariable(RandomVariable):
-#     def __init__(self, alpha, beta, c):
-#         self.alpha = alpha
-#         self.beta = beta
-#         self.c = c
+class cBetaRandomVariable(RandomVariable):
+    def __init__(self, alpha, beta, c):
+        self.alpha = alpha
+        self.beta = beta
+        self.c = c
 
-#         # Cached values.
-#         self._char_fun_values = {}
-#         self._moment_values = {}
+        # Cached values.
+        self._char_fun_values = {}
+        self._moment_values = {}
 
-#     def compute_moment(self, order):
-#         return self.compute_moments(order)[order]
+    def compute_moment(self, order):
+        return self.compute_moments(order)[order]
 
-#     def compute_moments(self, order):
-#         """
-#         Compute all beta moments up to the given order. The returned list indices should match the moment orders
-#         e.g. the return[i] should be the ith beta moment
-#         """
-#         fs = map(lambda r: (self.alpha + r)/(self.alpha + self.beta + r), range(order))
-#         beta = [1] + list(accumulate(fs, lambda prev,n: prev*n))
-#         cbeta = [beta[i]*self.c**i for i in range(len(beta))]
-#         return cbeta
+    def compute_moments(self, order):
+        """
+        Compute all beta moments up to the given order. The returned list indices should match the moment orders
+        e.g. the return[i] should be the ith beta moment
+        """
+        fs = map(lambda r: (self.alpha + r)/(self.alpha + self.beta + r), range(order))
+        beta = [1] + list(accumulate(fs, lambda prev,n: prev*n))
+        cbeta = [beta[i]*self.c**i for i in range(len(beta))]
+        return cbeta
 
-#     def sample(self, n_samps):
-#         return self.c * np.random.beta(self.alpha, self.beta, size = (n_samps, 1))
+    def sample(self, n_samps):
+        return self.c * np.random.beta(self.alpha, self.beta, size = (n_samps, 1))
 
-#     def compute_characteristic_function(self, t):
-#         """
-#         The characteristic function of the beta distribution is Kummer's confluent hypergeometric function which 
-#         is implemented by scipy.special.hyp1f1. See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.hyp1f1.html
-#         If Phi_X(t) is the characteristic function of X, then for any constant c, the characteristic function of cX is
-#         Phi_cX(t) = Phi_X(ct)
-#         """
-#         return hyp1f1(self.alpha, self.beta, self.c * t)
+    def compute_characteristic_function(self, t):
+        """
+        The characteristic function of the beta distribution is Kummer's confluent hypergeometric function which 
+        is implemented by scipy.special.hyp1f1. See: https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.hyp1f1.html
+        If Phi_X(t) is the characteristic function of X, then for any constant c, the characteristic function of cX is
+        Phi_cX(t) = Phi_X(ct)
+        """
+        return hyp1f1(self.alpha, self.beta, self.c * t)
 
 class MultivariateNormal(object):
     def __init__(self, mean, covariance):
@@ -111,8 +112,8 @@ class MultivariateNormal(object):
             mean (n x 1 numpy array): mean vector
             covariance (n x n numpy array): covariance matrix
         """
-        self._mean = mean
-        self._covariance = covariance
+        self._mean = np.copy(mean)
+        self._covariance = np.copy(covariance)
 
     @property
     def mean(self):
@@ -133,11 +134,10 @@ class MultivariateNormal(object):
         """
         Express the MVN in a new frame that is rotated by the rotation matrix
         Args:
-            dtheta (rotation_matrix):
+            rotation_matrix (rotation matrix):
         """
-        # For counter clockwise rotations, need to multiply dtheta by -1.
-        self._mean = np.matmul(rotation_matrix, self._mean)
-        self._covariance = np.matmul(rotation_matrix, np.matmul(self._covariance, rotation_matrix.T))
+        self._mean = rotation_matrix @ self._mean
+        self._covariance = rotation_matrix @ self._covariance @ rotation_matrix.T
 
     def change_frame(self, offset_vec, rotation_matrix):
         """
@@ -147,7 +147,7 @@ class MultivariateNormal(object):
             rotation_matrix (n x n numpy array): rotation matrix corresponding to the angle of the x axis of frame A to frame B
         """
         # By convention, we need to translate before rotating.
-        self._mean += -offset_vec
+        self._mean = self._mean - offset_vec
         self.rotate(rotation_matrix)
     
     def decompose_into_normals(self, override_independence = False):

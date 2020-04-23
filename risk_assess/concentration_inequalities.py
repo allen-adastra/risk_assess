@@ -5,7 +5,7 @@ Returns:
     [type]: [description]
 """
 from enum import Enum
-
+tol = 1e-6
 
 class ConcentrationInequality(Enum):
     CANTELLI = 1
@@ -13,13 +13,13 @@ class ConcentrationInequality(Enum):
     GAUSS = 3
 
 def cantelli(mean, variance):
-    assert mean >= 0.0
+    assert mean >= -tol
     return variance/(variance + mean**2)
 
 def vp(mean, variance):
-    assert mean >= ((5.0/3.0) * variance)**0.5
+    assert mean >= ((5.0/3.0) * variance)**0.5 - tol
     return (4.0/9.0) * cantelli(mean, variance)
 
 def gauss(mean, variance):
-    assert mean >= (2.0) * (variance)**0.5
+    assert mean >= (2.0) * (variance)**0.5 - tol
     return (2.0/9.0) * variance/(mean**2.0)
