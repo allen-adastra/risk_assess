@@ -216,6 +216,10 @@ class GmmQuadForm(object):
         """
         self._mvn_components = [(prob, MvnQuadForm(np.copy(A), mvn)) for prob, mvn in zip(gmm.component_probabilities, gmm.component_random_variables)]
     
+    @property
+    def mvn_components(self):
+        return self._mvn_components
+
     def component_upper_tail_probs(self, t, method, overshoot_one_tolerance = 1e-6, **kwargs):
         """
         Compute the component probabilities:
@@ -231,11 +235,9 @@ class GmmQuadForm(object):
             P(Q > t)
         """
         upper_tail_prob = 0
-        i = 0
         for component_weight, mvnqf in self._mvn_components:                
             mvnqf_prob = mvnqf.upper_tail_probability(t, method, **kwargs)
             upper_tail_prob += component_weight * mvnqf_prob
-            i += 1
         # The calculated probability will have an associated numerical error. Check
         # that the numerical error does not exceed the tolerable amount.
         assert upper_tail_prob < 1.0 + overshoot_one_tolerance

@@ -111,7 +111,7 @@ class GmmTrajectory(object):
             ego_vehicle_position = np.array([[xs[i]],
                                              [ys[i]]])
             rot_mat = rotation_matrix(-thetas[i])
-            gmm = deepcopy(gmms[i])
+            gmm = GMM([deepcopy(comp) for comp in zip(gmms[i].component_probabilities, gmms[i].component_random_variables)])
             gmm.change_frame(ego_vehicle_position, rot_mat)
             gmm_quad_forms[i] = GmmQuadForm(Q, gmm)
         return gmm_quad_forms
