@@ -29,6 +29,10 @@ class GmmTrajectory(object):
          return self._gmms[index]
 
     @property
+    def weights(self):
+        return self._weights
+        
+    @property
     def array_rep(self):
         self.generate_array_rep()
         return self._mean_trajectories, self._covariance_trajectories, self._weights
