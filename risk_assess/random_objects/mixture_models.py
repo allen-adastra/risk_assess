@@ -6,6 +6,7 @@ class MixtureModel(RandomVariable):
         """
         component_random_variables: list of tuples of the form (weight, RandomVariable)
         """
+        self._mixture_components = mixture_components # List of tuples of (w, RV)
         self.component_probabilities = [comp[0] for comp in mixture_components]
         self.component_random_variables = [comp[1] for comp in mixture_components]
         sum_probs = sum(self.component_probabilities)
@@ -59,3 +60,6 @@ class GMM(MixtureModel):
         """
         for mvn in self.component_random_variables:
             mvn.change_frame(offset_vec, rotation_matrix)
+    
+    def copy(self):
+        return GMM([(w, mvn.copy()) for w, mvn in self._mixture_components])

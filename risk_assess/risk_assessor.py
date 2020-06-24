@@ -1,7 +1,5 @@
-from risk_assess.geom_utils import Ellipse, rotation_matrix, change_frame
-from risk_assess.deterministic import simulate_deterministic
-from risk_assess.uncertain_agent.moment_dynamics import propagate_moments
-from risk_assess.random_objects.quad_forms import GmmQuadForm
+from risk_assess.utils import rotation_matrix, change_frame
+from risk_assess.random_objects.quad_forms import GmmQuadForm, MvnQuadForm
 from risk_assess.concentration_inequalities import *
 import numpy as np
 import math
@@ -33,20 +31,6 @@ def chebyshev_bound_halfspace(half_space, moments):
     else:
         return None
 
-def evaluate_component(initial_agent_state, half_space_sets, input):
-    accel_seq, steer_seq, weight = input
-    moments = propagate_moments(initial_agent_state, accel_seq, steer_seq)
-    component_probs = len(moments)  * [0]
-    for i in range(len(moments)):
-        # The function chebyshev_bound_halfspace returns None when Chebyshev doesn't hold.
-        probs = [chebyshev_bound_halfspace(hs, moments[i]) for hs in half_space_sets[i]]
-        valid_probs = [p for p in probs if p is not None]
-        if valid_probs:
-            component_probs[i] = weight * min(valid_probs)
-        else:
-            component_probs[i] = None
-    return component_probs
-
 class RiskAssessor(object):
     def __init__(self, xs, ys, vs, thetas):
         """
@@ -61,37 +45,22 @@ class RiskAssessor(object):
         self.vs = vs
         self.thetas = thetas
 
-    def generate_ellipses(self, car_coord_ellipse):
-        """
-        Given an ellipse described in the car coordinates, generate
-        ellipses parameterized in the global frame.
-        """
-        cce = car_coord_ellipse
-        ellipses = len(self.xs) * [None]
-        for i in range(len(self.xs)):
-            x = self.xs[i]
-            y = self.ys[i]
-            t = self.thetas[i]
-            ellipses[i] = Ellipse(cce.a, cce.b, x + cce.x_center, y + cce.y_center, t + cce.theta)
-        return ellipses
-
-    def assess_risk_gmms(self, gmm_quad_forms, method, **kwargs):
+    @staticmethod
+    def assess_risk_gmms(body_frame_gmm_traj, A, eps_abs, eps_rel):
         """
         Given a list of gaussian mixture models (GMMs) assess the risk of this plan
         Args:
-            gmm_quad_forms (list of instances of GmmQuadForm):
-            method (string): method used to assess risk
+            gmm_traj (instance of GmmTrajectory)
         Returns:
             list of risks associated to the GMMs.
         """
-        risk_estimates = [1 - gmm_quad_form.upper_tail_probability(1, method, **kwargs) for gmm_quad_form in gmm_quad_forms]
+        risk_estimates = [1 - GmmQuadForm.upper_tail_probability_imhof(gmm, A, 1.0, eps_abs, eps_rel) for gmm in body_frame_gmm_traj]
         return risk_estimates
 
-    def assess_risk_gmms_conc(self, gmm_quad_forms, inequality):
+    @staticmethod
+    def assess_risk_gmms_conc(body_frame_gmm_traj, A, inequality):
         """
         Args:
-            gmm_traj ([type]): [description]
-            inequality (ConcentrationInequality): [description]
         """
         if inequality == ConcentrationInequality.CANTELLI:
             inequality_func = cantelli
@@ -101,29 +70,16 @@ class RiskAssessor(object):
             inequality_func = gauss
         else: 
             raise Exception("Invalid concentration inequality type.")
-
-        risk_bounds = len(gmm_quad_forms) * [None]
-        for i, gmm_qf in enumerate(gmm_quad_forms):
-            # For each GMMQF, compute the overall risk bound
-            # by taking the weighted sum of risk bounds on the components.
+        
+        t = 1.0 # By convention, we deal with x'Ax - 1 <= 0
+        risk_bounds = len(body_frame_gmm_traj) * [None]
+        for i, gmm in enumerate(body_frame_gmm_traj):
+            # For each GMMQF, compute the overall risk bound by taking the weighted sum of risk bounds on the components.
             gmm_qf_rb = 0.0
-            for weight, mvnqf in gmm_qf.mvn_components:
-                first_moment = mvnqf.compute_moment(1, 1)
-                second_moment = mvnqf.compute_moment(1, 2)
+            for weight, mvn in gmm:
+                first_moment = MvnQuadForm.compute_moment(mvn, A, t, 1)
+                second_moment = MvnQuadForm.compute_moment(mvn, A, t, 2)
                 variance = second_moment - first_moment**2.0
                 gmm_qf_rb += weight * inequality_func(first_moment, variance)
             risk_bounds[i] = gmm_qf_rb
         return risk_bounds
-
-    def gmm_quad_form_moments_to_matfile(self, gmm_quad_forms, directory, scenario_number):
-        n_components = len(gmm_quad_forms[0]._mvn_components)
-        traj_components = n_components * [{"weight" : None, "moments" : []}]
-        weights = [w for w,_ in gmm_quad_forms[0]._mvn_components]
-        for w, component in zip(weights, traj_components):
-            component["weight"] = w
-        all_gmm_qf_moments = [gmm_qf.compute_moments(5) for gmm_qf in gmm_quad_forms]
-        for i in range(n_components):
-            traj_components[i]["moments"] = [gmm_qf_moments[i] for gmm_qf_moments in all_gmm_qf_moments]
-        for i, comp in enumerate(traj_components):
-            filename = directory + "/" + "position_gmm_component_scenario_" + str(scenario_number) + "_component_" + str(i) + ".mat"
-            scipy.io.savemat(filename, comp)

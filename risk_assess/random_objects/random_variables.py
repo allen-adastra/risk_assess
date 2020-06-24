@@ -4,11 +4,6 @@ from scipy.stats import norm
 from scipy.special import hyp1f1
 from itertools import accumulate
 
-def is_diag(M):
-    i, j = np.nonzero(M)
-    return np.all(i == j)
-
-
 class RandomVariable(object):
     def __init__(self):
         # Cached values.
@@ -104,55 +99,3 @@ class cBetaRandomVariable(RandomVariable):
         Phi_cX(t) = Phi_X(ct)
         """
         return hyp1f1(self.alpha, self.beta, self.c * t)
-
-class MultivariateNormal(object):
-    def __init__(self, mean, covariance):
-        """
-        Args:
-            mean (n x 1 numpy array): mean vector
-            covariance (n x n numpy array): covariance matrix
-        """
-        self._mean = np.copy(mean)
-        self._covariance = np.copy(covariance)
-
-    @property
-    def mean(self):
-        return self._mean
-    
-    @property
-    def covariance(self):
-        return self._covariance
-
-    @property
-    def dimension(self):
-        return self._mean.shape[0]
-
-    def sample(self, n_samps):
-        return np.random.multivariate_normal(self._mean.flatten(), self._covariance, int(n_samps))
-
-    def rotate(self, rotation_matrix):
-        """
-        Express the MVN in a new frame that is rotated by the rotation matrix
-        Args:
-            rotation_matrix (rotation matrix):
-        """
-        self._mean = rotation_matrix @ self._mean
-        self._covariance = rotation_matrix @ self._covariance @ rotation_matrix.T
-
-    def change_frame(self, offset_vec, rotation_matrix):
-        """
-        Change from frame A to frame B.
-        Args:
-            offset_vec (nx1 numpy array): vector from origin of frame A to frame B
-            rotation_matrix (n x n numpy array): rotation matrix corresponding to the angle of the x axis of frame A to frame B
-        """
-        # By convention, we need to translate before rotating.
-        self._mean = self._mean - offset_vec
-        self.rotate(rotation_matrix)
-    
-    def decompose_into_normals(self, override_independence = False):
-        if is_diag(self._covariance) or override_independence:
-            dimension = self._covariance.shape[0]
-            return [Normal(self._mean[i][0], (self._covariance[i][i])**0.5)for i in range(dimension)]
-        else:
-            raise Exception("Multivariate normal covariance matrix is not diagonal. Cannot decompose into individual normals.")

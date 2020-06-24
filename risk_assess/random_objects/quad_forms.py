@@ -1,11 +1,12 @@
 import numpy as np
 from scipy.stats import ncx2, chi2
 import scipy.linalg as sla
-import rpy2.robjects as ro
-from rpy2.robjects.packages import importr
 import math
-stats = importr('stats')
-cqf = importr('CompQuadForm')
+import glob
+import ctypes
+import os
+import warnings
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 def compute_lambdas_deltas(mux, Sigmax, Q, diagonalization_error_tolerance = 1e-10):
     """
@@ -75,100 +76,93 @@ def check_symmetric(a, tol=1e-8):
 """
 This random variable is defined by the following quadratic form:
     Q = x'Ax
-Where x is some multivariate normal and A is a positive definite matrix. This is an implementation
-of the approximation method found in:
-http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.421.5737&rep=rep1&type=pdf
-Which tries to approximate this quadratic form with a non-central chi squared distribution.
+Where x is some multivariate normal and A is a positive definite matrix.
+The methods implemented here can be found in the following and its referencecs:
+    Duchesne, Pierre, and Pierre Lafaye De Micheaux. "Computing the distribution of quadratic forms: 
+    Further comparisons between the Liu–Tang–Zhang approximation and exact methods." Computational
+    Statistics & Data Analysis 54.4 (2010): 858-862.
 """
 class MvnQuadForm(object):
-    def __init__(self, A, mvn):
-        """
-        Args:
-            A: positive definite matrix as described above.
-            mvn: instance of MultivariateNormal
-        """
-        self._A = np.copy(A)
-        self._mu_x = mvn.mean
-        self._Sigma_x = mvn.covariance
-        self._mvn = mvn
+    #
+    # Load the C++ library.
+    #
+    # find the shared library, the path depends on the platform and Python version
+    libfile = glob.glob(dir_path + '/../../build/*/imhof*.so')[0]
 
-    def upper_tail_probability_monte_carlo(self, t, n_samples = 1e5):
-        A = self._A
-        mu_x = self._mu_x
-        Sigma = self._Sigma_x
-        samples = np.random.multivariate_normal(mu_x.flatten(), Sigma, int(n_samples))
+    # Open the shared library
+    imhof = ctypes.CDLL(libfile)
+
+    # Alias to shorten name.
+    double_ptr = np.ctypeslib.ndpointer(dtype=np.float64)
+
+    # Signature
+    # upper_tail_prob(const double &x, double *lambda, const int &lambdalen, double *h, double *delta2, double *Qx,
+    #                  double *epsabs_out, const double &epsabs, const double &epsrel, const int &limit)
+    # Tell ctypes the argument and result types.
+    imhof.upper_tail_prob.argtypes = [ctypes.c_double, double_ptr, ctypes.c_int, double_ptr, double_ptr, double_ptr\
+                                ,double_ptr, ctypes.c_double, ctypes.c_double, ctypes.c_int]
+    imhof.upper_tail_prob.restypes = [ctypes.c_void_p]
+    
+    @staticmethod
+    def upper_tail_probability_monte_carlo(mvn, A, t, n_samples = 1e5):
+        samples = np.random.multivariate_normal(mvn.mean, mvn.covariance, int(n_samples))
         samples = samples.T # 2 x n_samples array
         assert samples.shape[0] == 2
         res = (samples.T.dot(A)*samples.T).sum(axis=1)
         n_true = np.argwhere(res > t).size
         return float(n_true)/float(n_samples)
-
-    def upper_tail_probability_noncentral_chisquare(self, t):
+    
+    @staticmethod
+    def upper_tail_probability_noncentral_chisquare(mvn, A, t):
         """
         Approximate the upper tail probability using the noncentral chi square approximation.
         Use the scipy implementation of ncx2.
         """
-        tspecial, dof, noncentrality = compute_ncx2_params(t, self._mu_x, self._Sigma_x, self._A)
+        tspecial, dof, noncentrality = compute_ncx2_params(t, mvn.mean, mvn.covariance, A)
         if noncentrality == 0.0:
             # If non-centrality is zero, we can just use the standard chi2 distribution.
             return 1.0 - chi2.cdf(tspecial, dof, loc=0, scale=1)
         else:
             return 1.0 - ncx2.cdf(tspecial, dof , noncentrality)
 
-    def upper_tail_probability_noncentral_chisquare_R(self, t):
+    @staticmethod
+    def upper_tail_probability_imhof(mvn, A, t, eps_abs, eps_rel, limit=500):
+        """ Compute the upper tail probability using the method of imhof. This
+            calls this C++ function defined in cpp/imhof.cpp.
+
+        Args:
+            t (float): value of t in Prob(Q > t)
+            eps_abs (float): absolute error tolerance.
+            eps_rel (float): relative error tolerance.
+            limit (int, optional): Maximum number of mesh points for numerical integration. Defaults to 1000.
+
+        Returns:
+            float: [description]
         """
-        Approximate the upper tail probability using the noncentral chi square approximation.
-        Use the R implementation of ncx2.
-        """
-        tspecial, dof, noncentrality = compute_ncx2_params(t, self._mu_x, self._Sigma_x, self._A)
-        return 1.0 - stats.pchisq(tspecial, dof , noncentrality)[0]
+        # Compute lambda and delta parameters.
+        lambdas, deltas = compute_lambdas_deltas(mvn.mean, mvn.covariance, A)
+
+        # Convert to c types.
+        t = ctypes.c_double(t)
+        lambdas = lambdas.astype(np.float64)
+        nlambdas = ctypes.c_int(lambdas.size)
+        h = np.ones(lambdas.size, dtype=np.float64)
+        delta = deltas.astype(np.float64)
+        prob = np.array([0.0], dtype=np.float64)
+        epsabs_out = np.array([0.0], dtype=np.float64)
+        epsabs = ctypes.c_double(eps_abs)
+        epsrel = ctypes.c_double(eps_rel)
+        limit = ctypes.c_int(limit)
+
+        # Call the imhof C++ method.
+        MvnQuadForm.imhof.upper_tail_prob(t, lambdas, nlambdas, h, delta, prob, epsabs_out, epsabs, epsrel, limit)
+
+        if epsabs_out[0] > 2 * eps_abs:
+            warnings.warn("The absolute error is %.3E which is more than double the absolute error tolerance" % eps_abs)
+        return prob[0]
     
-    def upper_tail_probability_noncentral_chisquare_cqf(self, t):
-        """
-        Approximate the upper tail probability using the noncentral chi square approximation.
-        This directly uses the implementation in the CompQuadForm package in R.
-        """
-        lambdas, deltas = compute_lambdas_deltas(self._mu_x, self._Sigma_x, self._A)
-        return cqf.liu(t, ro.FloatVector(list(lambdas)), delta = ro.FloatVector(list(deltas)))[0]
-
-    def upper_tail_probability_imhof(self, t, eps_abs, eps_rel):
-        """
-        Use the method of imhof which has guaranteed bounds on error.
-        """
-        lambdas, deltas = compute_lambdas_deltas(self._mu_x, self._Sigma_x, self._A)
-        out = cqf.imhof(t, ro.FloatVector(list(lambdas)), delta = ro.FloatVector(list(deltas)), epsabs = eps_abs, epsrel = eps_rel)
-        out = dict(zip(out.names, list(out)))
-        if out['abserr'][0] > 2 * eps_abs:
-            print("Warning! The absolute error is %.3E which is more than double the absolute error tolerance" % out['abserr'][0])
-        return out['Qq'][0]
-
-    def upper_tail_probability(self, t, method, **kwargs):
-        """
-        Compute the probability:
-            Prob(x'Ax > t)
-        """
-        if method == "monte_carlo":
-            return self.upper_tail_probability_monte_carlo(t, kwargs['n_samples'])
-        elif method == "noncentral_chisquare":
-            return self.upper_tail_probability_noncentral_chisquare(t)
-        elif method == "noncentral_chisquare_R":
-            return self.upper_tail_probability_noncentral_chisquare_R(t)
-        elif method == "noncentral_chisquare_cqf":
-            return self.upper_tail_probability_noncentral_chisquare_cqf(t)
-        elif method == "imhof":
-            imhof_prob =  self.upper_tail_probability_imhof(t, kwargs['eps_abs'], kwargs['eps_rel'])
-            return imhof_prob
-        else:
-            raise NotImplementedError("Invalid method name.")
-    
-    def compute_moments(self, t, dmax):
-        """
-        Compute the moments of Q(x) - t so that the Chebshev and SOS techniques can be used for
-        estimating Prob(Q(x) - t <= 0).
-        """
-        return [self.compute_moment(t, i) for i in range(dmax + 1)]
-
-    def compute_moment(self, t, d):
+    @staticmethod
+    def compute_moment(mvn, A, t, d):
         """
         Compute the moments of Q(x) - t so that the Chebshev and SOS techniques can be used for
         estimating Prob(Q(x) - t <= 0).
@@ -177,29 +171,31 @@ class MvnQuadForm(object):
             return 1
         elif d == 1:
             # https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
-            return np.trace(self._A @ self._Sigma_x) + (self._mu_x.T @ self._A @ self._mu_x)[0][0] - t
+            return np.trace(A @ mvn.covariance) + (mvn.mean.T @ A @ mvn.mean) - t
         elif d == 2:
             # https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
             # Note: variance is invariant under translation, so we don't worry about the -1 component.
-            if not check_symmetric(self._A):
-                A_mat = 0.5 * (self._A + self._A.T)
+            if not check_symmetric(A):
+                A = 0.5 * (A + A.T)
             else:
-                A_mat = self._A
-            variance = 2 * np.trace(A_mat @ self._Sigma_x @ A_mat @ self._Sigma_x) + 4 * self._mu_x.T @ A_mat @ self._Sigma_x @ A_mat @ self._mu_x
-            return variance[0][0] + self.compute_moment(t, 1)**2
+                A = A
+            variance = 2 * np.trace(A @ mvn.covariance @ A @ mvn.covariance) + 4 * mvn.mean.T @ A @ mvn.covariance @ A @ mvn.mean
+            return variance + MvnQuadForm.compute_moment(mvn, A, t, 1)**2
         elif d > 2:
             raise Warning("Using monte carlo to compute moments.")
-            return self.monte_carlo_moments(t, d)
+            return MvnQuadForm.monte_carlo_moments(mvn, A, t, d)
 
-    def monte_carlo_moments(self, t, d, n_samples = 1e6):
+    @staticmethod
+    def monte_carlo_moments(mvn, A, t, d, n_samples = 1e6):
         """
         Estimate the moments of Q(x) - t with Monte Carlo.
         """
-        samples = np.random.multivariate_normal(self._mu_x.flatten(), self._Sigma_x, int(n_samples))
+        samples = np.random.multivariate_normal(mvn.mean, mvn.covariance, int(n_samples))
         samples = samples.T
-        quad_form_samps = (samples.T.dot(self._A)*samples.T).sum(axis=1)
+        quad_form_samps = (samples.T.dot(A)*samples.T).sum(axis=1)
         quad_form_samps_minus_one = quad_form_samps - t * np.ones(quad_form_samps.shape)
         return np.mean(np.power(quad_form_samps_minus_one, d))
+
 
 class GmmQuadForm(object):
     """
@@ -208,43 +204,22 @@ class GmmQuadForm(object):
     Where x is some Gaussian Mixture Model (GMM) and A is a positive definite matrix.
     This is an extension of MvnQuadForm.
     """
-    def __init__(self, A, gmm):
-        """
-        Args:
-            A (numpy array): as defined
-            gmm (instance of MixtureModel with instances of MultivariateNormal as components)
-        """
-        self._mvn_components = [(prob, MvnQuadForm(np.copy(A), mvn)) for prob, mvn in zip(gmm.component_probabilities, gmm.component_random_variables)]
-    
-    @property
-    def mvn_components(self):
-        return self._mvn_components
 
-    def component_upper_tail_probs(self, t, method, overshoot_one_tolerance = 1e-6, **kwargs):
-        """
-        Compute the component probabilities:
-            P(Q_i > t)
-        Where Q_i is a component of Q.
-        """
-        component_probs = [mvnqf.upper_tail_probability(t, method, **kwargs) for _, mvnqf in self._mvn_components]
-        return component_probs
-
-    def upper_tail_probability(self, t, method,  overshoot_one_tolerance = 1e-6, **kwargs):
+    @staticmethod
+    def upper_tail_probability_imhof(gmm, A, t, eps_abs, eps_rel):
         """
         Approximate the probability:
             P(Q > t)
         """
         upper_tail_prob = 0
-        for component_weight, mvnqf in self._mvn_components:                
-            mvnqf_prob = mvnqf.upper_tail_probability(t, method, **kwargs)
+        for component_weight, mvn in gmm:                
+            mvnqf_prob = MvnQuadForm.upper_tail_probability_imhof(mvn, A, t, eps_abs, eps_rel)
             upper_tail_prob += component_weight * mvnqf_prob
-        # The calculated probability will have an associated numerical error. Check
-        # that the numerical error does not exceed the tolerable amount.
-        assert upper_tail_prob < 1.0 + overshoot_one_tolerance
-        return min(upper_tail_prob, 1.0)
+        return upper_tail_prob
     
-    def compute_moment(self, t, d):
-        """
-        Compute the dth moment of Q(x) - t.
-        """
-        return sum([w * mvnqf.compute_moment(t, d) for w, mvnqf in self._mvn_components])
+    @staticmethod
+    def compute_moment(gmm, A, t, d):
+        moment = 0.0
+        for w, mvn in gmm:
+            moment += w * MvnQuadForm.compute_moment(mvn, A, t, d)
+        return moment
