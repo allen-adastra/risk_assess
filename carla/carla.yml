@@ -1,0 +1,14 @@
+name: carla
+channels:
+  - anaconda
+  - defaults
+dependencies:
+  - python=3.5
+  - libpng=1.6.37=hbc83047_0
+  - numpy
+  - pip
+  - conda-build
+  - tqdm
+  - pip:
+    - pygame==1.9.6
+    - transforms3d

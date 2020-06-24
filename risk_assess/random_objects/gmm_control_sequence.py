@@ -1,6 +1,6 @@
 import numpy as np
 from risk_assess.random_objects.mixture_models import GMM
-from risk_assess.random_objects.random_variables import MultivariateNormal, Normal
+from risk_assess.random_objects.multivariate_normal import MultivariateNormal, Normal
 """
 A sequence of Gaussian Mixture Models (GMMs) that represents predicted controls.
 The weights are invariant across time.

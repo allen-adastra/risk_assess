@@ -1,8 +1,8 @@
 import numpy as np
-from risk_assess.random_objects.random_variables import MultivariateNormal
+from risk_assess.random_objects.multivariate_normal import MultivariateNormal
 from risk_assess.random_objects.mixture_models import GMM
 from risk_assess.random_objects.quad_forms import GmmQuadForm
-from risk_assess.geom_utils import rotation_matrix
+from risk_assess.utils import rotation_matrix
 import scipy.io
 from copy import deepcopy
 
@@ -27,6 +27,10 @@ class GmmTrajectory(object):
     
     def __getitem__(self,index):
          return self._gmms[index]
+
+    @property
+    def n_components(self):
+        return self._n_components
 
     @property
     def weights(self):
@@ -97,29 +101,6 @@ class GmmTrajectory(object):
         gmm_traj = cls(gmms)
         return gmm_traj
 
-    def generate_gmm_quad_forms(self, xs, ys, thetas, Q):
-        """
-        Given an ego vehicle plan represented by a sequence of poses and the parameters
-        of the ellipse around the ego vehicle, generate a GmmQuadForm at each time step.
-        Args:
-            xs ([type]): ego vehicle x
-            ys ([type]): ego vehicle y
-            thetas ([type]): ego vehicle heading
-            Q (2x2 numpy array) : matrix defining the collision ellipse
-        Returns:
-            [type]: [description]
-        """
-        gmms = self._gmms
-        gmm_quad_forms = len(gmms) * [None]
-        for i in range(len(gmms)):
-            ego_vehicle_position = np.array([[xs[i]],
-                                             [ys[i]]])
-            rot_mat = rotation_matrix(-thetas[i])
-            gmm = GMM([deepcopy(comp) for comp in zip(gmms[i].component_probabilities, gmms[i].component_random_variables)])
-            gmm.change_frame(ego_vehicle_position, rot_mat)
-            gmm_quad_forms[i] = GmmQuadForm(Q, gmm)
-        return gmm_quad_forms
-
     def check_consistency(self):
         # First check that the number of components for each GMM is the same.
         components_per_gmm = [len(gmm.component_random_variables) for gmm in self._gmms]
@@ -148,17 +129,18 @@ class GmmTrajectory(object):
                 covs[j] = rv.covariance
             self._mean_trajectories[i] = means
             self._covariance_trajectories[i] = covs
-    
-    def change_frame(self, offset_vec, rotation_matrix):
-        """
-        Change from frame A to frame B.
+
+    def in_body_frame(self, xys, thetas):
+        """ Generate an instance of GmmTrajectory in the body frame.
+
         Args:
-            offset_vec (nx1 numpy array): vector from origin of frame A to frame B
-            rotation_matrix (n x n numpy array): rotation matrix corresponding to the angle of the x axis of frame A to frame B
+            xys (2xn array): 
+            thetas ([type]): [description]
         """
-        # Apply to each component of each GMM in the trajectory.
-        for gmm in self._gmms:
-            gmm.change_frame(offset_vec, rotation_matrix)
+        new_gmms = [gmm.copy() for gmm in self._gmms]
+        for i, gmm in enumerate(new_gmms):
+            gmm.change_frame(xys[:, i], rotation_matrix(-thetas[i]))
+        return GmmTrajectory(new_gmms)
 
     def save_as_matfile(self, directory, filename):
         """
