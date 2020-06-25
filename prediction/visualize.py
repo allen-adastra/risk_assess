@@ -18,7 +18,7 @@ def draw_traj(traj, marker, color, alpha=1, markersize=6, zorder=15):
     """
     Modified from argoverse.visualization.visualize_sequences.viz_sequence
     """
-    plt.plot(traj[:,0], traj[:,1],
+    plt.plot(traj[0,:], traj[1,:],
         marker,
         color=color,
         alpha=alpha,
@@ -41,7 +41,7 @@ def draw_prediction_gmm(ax, gmm_trajectory):
     for k in range(num_component):
         mean_traj = mean_trajs[k]
         covariance_traj = covariance_trajs[k]
-        draw_traj(mean_traj, marker="o", color='b', alpha=0.6, markersize=1)
+        draw_traj(mean_traj.T, marker="o", color='b', alpha=0.6, markersize=1)
         # plot weights
         plt.text(mean_traj[-1, 0], mean_traj[-1, 1], "%.2f" % weights[k])
 

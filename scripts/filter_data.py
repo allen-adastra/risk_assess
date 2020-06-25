@@ -3,6 +3,7 @@
 import argparse
 from scipy.spatial import distance
 import os
+from shutil import copyfile
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -202,7 +203,7 @@ def filter_argoverse_data(input_dir, output_dir, convert_limit=0, filters=[], vi
             file_name = os.path.split(data.current_seq)[-1]
             path_src = os.path.join(input_dir, file_name)
             path_dst = os.path.join(output_dir, file_name)
-            os.symlink(path_src, path_dst)
+            copyfile(path_src, path_dst)
 
         if visualize and pass_all_filters:
             fig, ax = plt.subplots()
