@@ -26,80 +26,26 @@ from prediction.model import RNNEncoderDecoder
 from prediction.utils import load_model
 from prediction.visualize import draw_lane_centerlines, draw_traj, draw_prediction_gmm
 
-from risk_assess.random_objects.gmm_trajectory import GmmTrajectory
-from risk_assess.random_objects.gmm_control_sequence import GmmControlSequence
-from risk_assess.deterministic import simulate_deterministic
 import risk_assess.risk_assessors as ra
+
+from utils import *
 
 # fix random seed
 torch.manual_seed(0)
 
-def compute_absolute_errors(true_risks, estimated_risks):
-    assert len(true_risks) == len(estimated_risks)
-    return [abs(est_risk - true_risk) for true_risk, est_risk in zip(true_risks, estimated_risks)]
-
-def compute_relative_errors(true_risks, estimated_risks):
-    assert len(true_risks) == len(estimated_risks)
-    return [est_risk/true_risk - 1 if true_risk > 0 else 0 for true_risk, est_risk in zip(true_risks, estimated_risks)]
-
-def predict(data, model, scale_k):
-    # Load some data and make a prediction off it.
-    past_traj, target = data
-    past_traj_origin = target['past_traj_origin'] # Past trajectory of the agent.
-    past_traj = past_traj.unsqueeze(0) # build a batch with size 1
-    prediction = model(past_traj)
-
-    # Unnormalize predictions
-    R = target['R']
-    t = np.asarray(target['t'])
-
-    gmm_traj = GmmTrajectory.from_prediction(prediction, scale_k)
-    
-    # Change the frame into the global frame.
-    gmm_traj_global = gmm_traj.in_frame(t, R.T)
-
-    gmm_control_seq = GmmControlSequence.from_prediction(prediction)
-    
-    return gmm_traj_global, gmm_control_seq, past_traj_origin
-
-def generate_ego_trajectory(past_traj_origin, steps, dt):
-    # TODO: initial random crap put in
-    x0 = past_traj_origin[-1][0] + 2.5
-    y0 = past_traj_origin[-1][1] + 2.5
-    v0 = 7.0
-    theta0 = 0.0
-    accels = np.asarray([0.1 for i in range(steps)])
-    steers = np.asarray([0.1 for i in range(steps)])
-    xs, ys, vs, thetas = simulate_deterministic(x0, y0, v0, theta0, accels, steers, dt)
-    ego_xys = np.vstack((xs, ys))
-    return ego_xys, thetas
-
 def main(test_dir, session_id, save_results):
     """
-    Test the predictor using saved parameters and models
+    Test the predictor and assess risk. Running this will output pickle files in
+    dataset/test_results and plots in /tmp/argoverse.
     """
 
-    """
-    Configure.
-    """
-    with open(dir_path + "/params.yaml") as file:
-        params = yaml.full_load(file)
+    model, dataset, params, scale_k, file_name = load(test_dir, session_id)
 
-    # Output file name
-    file_name = datetime.now().strftime("%m%d%Y-%H%M") + "_" + session_id 
-    device = 'cpu'
-    
-    # load parameters and models
-    model = RNNEncoderDecoder(device)
-    model_info, model = load_model(session_id, model)
-    model_args, training_args = model_info['model_args'], model_info['training_args']
-
-    # create data
-    scale_k = training_args['position_downscaling_factor']
-    dataset = ArgoverseDataset(test_dir, training_args['obs_len'], scale_k)
-
+    #
     # Specify a method to treat as ground truth and specify a list of methods to test.
-    # Each method specification is of the form (name, kwargs)
+    # Each method specification is of the form (name, kwargs). We will collect
+    # the data for each method and dump it later.
+    #
     ground_truth_method = ('imhof', {'eps_abs' : 1e-10, 'eps_rel' : 1e-10, 'limit' : 500})
     methods = [ground_truth_method, 
                ('ltz', {}),
@@ -108,14 +54,17 @@ def main(test_dir, session_id, save_results):
                ('monte_carlo', {'n_samples' : int(1e5)})]
     results = dict()
     Q = np.asarray(params["ellipse_Q"])
+
+
+    # Run risk assessment for every data point in the dataset.
     for i in tqdm(range(len(dataset))):
         gmm_traj, _, past_traj_origin = predict(dataset[i], model, scale_k)
-        # TODO: transform gmm_traj into ego vehicle body frame
-
+        
+        # Generate the ego vehicle trajectory.
         ego_xys, thetas = generate_ego_trajectory(past_traj_origin, len(gmm_traj), params["dt"])
 
+        # Transform the prediction into the body frame of the ego vehicle and assess risk.
         body_frame_gmm_traj = gmm_traj.in_body_frame(ego_xys, thetas)
-
         ground_truth_risks, t_ground_truth = ra.assess_risk_gmms(body_frame_gmm_traj, Q, ground_truth_method[0], **ground_truth_method[1])
 
         # Assess risk with the test methods.
@@ -132,16 +81,14 @@ def main(test_dir, session_id, save_results):
             results[key_name]['max_absolute_error'].append(max(compute_absolute_errors(ground_truth_risks, risks)))
             results[key_name]['max_relative_error'].append(max(compute_relative_errors(ground_truth_risks, risks)))
 
-        # Generate a plot
-        fig = plt.figure("traj_pred_test")
-        ax = plt.gca()
-        draw_traj(ego_xys, marker="x", color="#FF0000" )
-        draw_traj(past_traj_origin.T, marker="s", color="#d33e4c")
-        draw_prediction_gmm(ax, gmm_traj)
-        plt.legend(['Ego Vehicle Planned Trajectory', 'Agent Observed Trajectory'], fontsize = 14)
-
         if save_results:
-            # Save plots
+            # Generate and save a plot and save the results in a pickle file.
+            fig = plt.figure("traj_pred_test")
+            ax = plt.gca()
+            draw_traj(ego_xys, marker="x", color="#FF0000" )
+            draw_traj(past_traj_origin.T, marker="s", color="#d33e4c")
+            draw_prediction_gmm(ax, gmm_traj)
+            plt.legend(['Ego Vehicle Planned Trajectory', 'Agent Observed Trajectory'], fontsize = 14)
             fname = os.path.join("/tmp/argoverse/prediction_viz_{}_{}.png".format(session_id, str(i)))
             fig.tight_layout()
             plt.savefig(fname, dpi=600)
@@ -151,10 +98,8 @@ def main(test_dir, session_id, save_results):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument('--test_dir', type=str,
-                        help='test directory')
-    parser.add_argument('--session_id', type=str,
-                        help='model name')
+    parser.add_argument('--test_dir', type=str, default=dir_path + '/../dataset/argoverse_filtered', help='test directory')
+    parser.add_argument('--session_id', type=str, default='345ab5bce047400e8a3913784511f547', help='model name')
     parser.add_argument('--save_results', default = False, type = bool)
     args = parser.parse_args()
 
