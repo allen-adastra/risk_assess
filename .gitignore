@@ -7,3 +7,4 @@ sos_risk_assessment/data
 .installed.cfg
 *.egg
 build/
+*.so

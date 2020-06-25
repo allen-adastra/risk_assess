@@ -33,6 +33,30 @@ from utils import *
 # fix random seed
 torch.manual_seed(0)
 
+
+def load(test_dir, session_id):
+    """
+    Test the predictor using saved parameters and models
+    """
+
+    with open(dir_path + "/params.yaml") as file:
+        params = yaml.full_load(file)
+
+    # Output file name
+    file_name = datetime.now().strftime("%m%d%Y-%H%M") + "_" + session_id 
+    device = 'cpu'
+    
+    # load parameters and models
+    model = RNNEncoderDecoder(device)
+    model_info, model = load_model(session_id, model)
+    model_args, training_args = model_info['model_args'], model_info['training_args']
+
+    # create data
+    scale_k = training_args['position_downscaling_factor']
+    dataset = ArgoverseDataset(test_dir, training_args['obs_len'], scale_k)
+
+    return model, dataset, params, scale_k, file_name
+
 def main(test_dir, session_id, save_results):
     """
     Test the predictor and assess risk. Running this will output pickle files in

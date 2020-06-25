@@ -51,26 +51,3 @@ def generate_ego_trajectory(past_traj_origin, steps, dt):
     xs, ys, vs, thetas = simulate_deterministic(x0, y0, v0, theta0, accels, steers, dt)
     ego_xys = np.vstack((xs, ys))
     return ego_xys, thetas
-
-def load(test_dir, session_id):
-    """
-    Test the predictor using saved parameters and models
-    """
-
-    with open(dir_path + "/params.yaml") as file:
-        params = yaml.full_load(file)
-
-    # Output file name
-    file_name = datetime.now().strftime("%m%d%Y-%H%M") + "_" + session_id 
-    device = 'cpu'
-    
-    # load parameters and models
-    model = RNNEncoderDecoder(device)
-    model_info, model = load_model(session_id, model)
-    model_args, training_args = model_info['model_args'], model_info['training_args']
-
-    # create data
-    scale_k = training_args['position_downscaling_factor']
-    dataset = ArgoverseDataset(test_dir, training_args['obs_len'], scale_k)
-
-    return model, dataset, params, scale_k, file_name
