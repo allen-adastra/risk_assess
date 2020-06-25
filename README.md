@@ -2,23 +2,20 @@
 Code for:
 Wang, Allen, et al. "Fast Risk Assessment for Autonomous Vehicles Using Learned Models of Agent Futures." arXiv preprint arXiv:2005.13458 (2020).
 
-We are currently in the process of organizing and cleaning up our code for presentation to the public. Expect this to be ready by the time the paper is published in Robotics: Science and Systems!
+We are currently in the process of organizing and cleaning up our code for presentation to the public. 
 
-## Data
-#### Filter and subsampling data
-Let $REPO_ROOT be the path to the root of the repo.
-```bash
-python scripts/filter_argoverse_data.py -i $REPO_ROOT/dataset/argoverse_raw/forecasting_sample/data/ -o $REPO_ROOT/dataset/argoverse_filtered -l 500
-```
-*l* specifies the number of samples to keep.
+## Setup
+Run `source setup.sh`. We've included a virtual environment in this repo for your convenience, so you just need to run `source venv/bin/activate` and you should be able to run things.
 
-#### Train a model
-Go to project directory, and run:
-```bash
-tensorboard --logdir=logs/
-python prediction/train.py --data_dir dataset/argoverse_filtered/ --log_dir=logs/
-```
-See tensorboard logs using the link given after running the first command.
+## Examples
+`/examples/position_risk_assessment.py` utilizes the GMM position risk assessment methods.
 
-### Contact
-Cyrus Huang, xhuang at csail dot mit dot edu
+`/examples/control_risk_assessment` utilizes the control risk assessment methods. TreeRing is included in a separate package [AlgebraicMoments](https://github.com/allen-adastra/algebraic_moments).
+
+
+All code for SOS risk assessment is in `/risk_assess/sos_risk_assessment`.
+
+## Contact
+Allen Wang, allenw@mit.edu
+
+Cyrus Huang, xhuang@csail.mit.edu
