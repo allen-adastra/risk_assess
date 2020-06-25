@@ -124,7 +124,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('--test_dir', type=str, default=dir_path + '/../dataset/argoverse_filtered', help='test directory')
     parser.add_argument('--session_id', type=str, default='345ab5bce047400e8a3913784511f547', help='model name')
-    parser.add_argument('--save_results', default = False, type = bool)
+    parser.add_argument('--save_results', default = True, type = bool)
     args = parser.parse_args()
 
     main(args.test_dir, args.session_id, args.save_results)
