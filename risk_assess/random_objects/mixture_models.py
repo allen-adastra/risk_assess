@@ -55,7 +55,7 @@ class GMM(MixtureModel):
         """
         Change from frame A to frame B.
         Args:
-            offset_vec (nx1 numpy array): vector from origin of frame A to frame B
+            offset_vec (1D array): vector from origin of frame A to frame B
             rotation_matrix (n x n numpy array): rotation matrix corresponding to the angle of the x axis of frame A to frame B
         """
         for mvn in self.component_random_variables:

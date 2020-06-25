@@ -31,7 +31,7 @@ def compute_cks(lambdas, deltas):
     cs = dict()
     for k in range(1, 5):
         lambda_power = np.power(lambdas, k)
-        cs[k] = (sum(lambda_power) + k * np.dot(lambda_power, deltas))[0]
+        cs[k] = (sum(lambda_power) + k * np.dot(lambda_power, deltas))
     return cs
 
 def compute_dof_noncentrality(s1, s2):
@@ -104,7 +104,8 @@ class MvnQuadForm(object):
     imhof.upper_tail_prob.restypes = [ctypes.c_void_p]
     
     @staticmethod
-    def upper_tail_probability_monte_carlo(mvn, A, t, n_samples = 1e5):
+    def upper_tail_probability_monte_carlo(mvn, A, t, **kwargs):
+        n_samples = kwargs["n_samples"]
         samples = np.random.multivariate_normal(mvn.mean, mvn.covariance, int(n_samples))
         samples = samples.T # 2 x n_samples array
         assert samples.shape[0] == 2
@@ -113,10 +114,11 @@ class MvnQuadForm(object):
         return float(n_true)/float(n_samples)
     
     @staticmethod
-    def upper_tail_probability_noncentral_chisquare(mvn, A, t):
+    def upper_tail_probability_noncentral_chisquare(mvn, A, t, **kwargs):
         """
         Approximate the upper tail probability using the noncentral chi square approximation.
-        Use the scipy implementation of ncx2.
+        Use the scipy implementation of ncx2. This is the method of liu tang zhang.
+        https://doi.org/10.1016/j.csda.2009.11.025
         """
         tspecial, dof, noncentrality = compute_ncx2_params(t, mvn.mean, mvn.covariance, A)
         if noncentrality == 0.0:
@@ -126,7 +128,7 @@ class MvnQuadForm(object):
             return 1.0 - ncx2.cdf(tspecial, dof , noncentrality)
 
     @staticmethod
-    def upper_tail_probability_imhof(mvn, A, t, eps_abs, eps_rel, limit=500):
+    def upper_tail_probability_imhof(mvn, A, t, **kwargs):
         """ Compute the upper tail probability using the method of imhof. This
             calls this C++ function defined in cpp/imhof.cpp.
 
@@ -139,6 +141,10 @@ class MvnQuadForm(object):
         Returns:
             float: [description]
         """
+        eps_abs = kwargs["eps_abs"]
+        eps_rel = kwargs["eps_rel"]
+        limit = kwargs["limit"]
+
         # Compute lambda and delta parameters.
         lambdas, deltas = compute_lambdas_deltas(mvn.mean, mvn.covariance, A)
 
@@ -200,23 +206,29 @@ class MvnQuadForm(object):
 class GmmQuadForm(object):
     """
     This random variable is defined by:
-        Q = x'Ax
-    Where x is some Gaussian Mixture Model (GMM) and A is a positive definite matrix.
-    This is an extension of MvnQuadForm.
+        Q = x'Qx
+    Where x is some Gaussian Mixture Model (GMM) and Q is a positive definite matrix.
     """
 
     @staticmethod
-    def upper_tail_probability_imhof(gmm, A, t, eps_abs, eps_rel):
-        """
-        Approximate the probability:
-            P(Q > t)
-        """
+    def upper_tail_probability(gmm, Q, t, method, **kwargs):
+        # Choose the method to compute the component probabilities.
+        if method == "imhof":
+            mvnqf_method = MvnQuadForm.upper_tail_probability_imhof
+        elif method == "ltz":
+            mvnqf_method = MvnQuadForm.upper_tail_probability_noncentral_chisquare
+        elif method == "monte_carlo":
+            mvnqf_method = MvnQuadForm.upper_tail_probability_monte_carlo
+        else:
+            raise Exception("Invalid method input.")
+
+        # Compute the probability as the weighted sum of the components.
         upper_tail_prob = 0
-        for component_weight, mvn in gmm:                
-            mvnqf_prob = MvnQuadForm.upper_tail_probability_imhof(mvn, A, t, eps_abs, eps_rel)
+        for component_weight, mvn in gmm:
+            mvnqf_prob = mvnqf_method(mvn, Q, t, **kwargs)
             upper_tail_prob += component_weight * mvnqf_prob
         return upper_tail_prob
-    
+
     @staticmethod
     def compute_moment(gmm, A, t, d):
         moment = 0.0

@@ -69,8 +69,8 @@ class GmmControlSequence(object):
         for i in range(self._n_components):
             for j in range(len(self._gmms)):
                 mvn = self._gmms[j].component_random_variables[i]
-                accel_rvs[i][j] = Normal(mvn.mean[0][0], mvn.covariance[0][0]**0.5)
-                steer_rvs[i][j] = Normal(mvn.mean[1][0], mvn.covariance[1][1]**0.5)
+                accel_rvs[i][j] = Normal(mvn.mean[0], mvn.covariance[0][0]**0.5)
+                steer_rvs[i][j] = Normal(mvn.mean[1], mvn.covariance[1][1]**0.5)
         self._array_rv_rep = {"accels" : accel_rvs, "steers" : steer_rvs, "weights" : self._weights}
 
     def check_consistency(self):

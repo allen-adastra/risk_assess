@@ -130,8 +130,21 @@ class GmmTrajectory(object):
             self._mean_trajectories[i] = means
             self._covariance_trajectories[i] = covs
 
+    def in_frame(self, offset_vec, rotation_matrix):
+        """
+        Change from frame A to frame B.
+        Args:
+            offset_vec (nx1 numpy array): vector from origin of frame A to frame B
+            rotation_matrix (n x n numpy array): rotation matrix corresponding to the angle of the x axis of frame A to frame B
+        """
+        new_gmms = [gmm.copy() for gmm in self._gmms]
+        # Apply to each component of each GMM in the trajectory.
+        for gmm in new_gmms:
+            gmm.change_frame(offset_vec, rotation_matrix)
+        return GmmTrajectory(new_gmms)
+
     def in_body_frame(self, xys, thetas):
-        """ Generate an instance of GmmTrajectory in the body frame.
+        """ Generate an instance of GmmTrajectory in the body frame defined by the input array.
 
         Args:
             xys (2xn array): 
