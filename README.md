@@ -10,10 +10,10 @@ Run `source setup.sh`. We've included a virtual environment in this repo for you
 ## Examples
 `/examples/position_risk_assessment.py` utilizes the GMM position risk assessment methods.
 
-`/examples/control_risk_assessment` utilizes the control risk assessment methods. TreeRing is included in a separate package [AlgebraicMoments](https://github.com/allen-adastra/algebraic_moments).
+**STILL CLEANING UP**: `/examples/control_risk_assessment` utilizes the control risk assessment methods. TreeRing is included in a separate package [AlgebraicMoments](https://github.com/allen-adastra/algebraic_moments).
 
 
-All code for SOS risk assessment is in `/risk_assess/sos_risk_assessment`.
+All code for SOS risk assessment is in `/risk_assess/sos_risk_assessment`. We use Yalmip, so the SOS code is in MATLAB.
 
 ## Contact
 Allen Wang, allenw@mit.edu
