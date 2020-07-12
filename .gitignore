@@ -9,3 +9,4 @@ sos_risk_assessment/data
 build/
 *.so
 dataset/test_results
+venv/*
