@@ -5,7 +5,7 @@ Wang, Allen, et al. "Fast Risk Assessment for Autonomous Vehicles Using Learned 
 We are currently in the process of organizing and cleaning up our code for presentation to the public. 
 
 ## Setup
-Run `source setup.sh`. We've included a virtual environment in this repo for your convenience, so you just need to run `source venv/bin/activate` and you should be able to run things.
+Run `source setup.sh`. It will create a virtual environment that allows you to run the code, so you just need to run `source venv/bin/activate` and you should be able to run things.
 
 ## Examples
 `/examples/position_risk_assessment.py` utilizes the GMM position risk assessment methods.
