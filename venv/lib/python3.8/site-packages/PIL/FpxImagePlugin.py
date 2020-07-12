@@ -59,8 +59,8 @@ class FpxImageFile(ImageFile.ImageFile):
 
         try:
             self.ole = olefile.OleFileIO(self.fp)
-        except OSError:
-            raise SyntaxError("not an FPX file; invalid OLE file")
+        except OSError as e:
+            raise SyntaxError("not an FPX file; invalid OLE file") from e
 
         if self.ole.root.clsid != "56616700-C154-11CE-8553-00AA00A1F95B":
             raise SyntaxError("not an FPX file; bad root CLSID")
@@ -99,7 +99,7 @@ class FpxImageFile(ImageFile.ImageFile):
         colors = []
         bands = i32(s, 4)
         if bands > 4:
-            raise IOError("Invalid number of bands")
+            raise OSError("Invalid number of bands")
         for i in range(bands):
             # note: for now, we ignore the "uncalibrated" flag
             colors.append(i32(s, 8 + i * 4) & 0x7FFFFFFF)
