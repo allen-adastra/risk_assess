@@ -1,3 +1,0 @@
-[submodule "argoverse-api"]
-	path = argoverse-api
-	url = git@github.com:argoai/argoverse-api.git
