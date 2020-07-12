@@ -42,16 +42,16 @@ class FliImageFile(ImageFile.ImageFile):
 
         # HEAD
         s = self.fp.read(128)
-        magic = i16(s[4:6])
         if not (
-            magic in [0xAF11, 0xAF12]
+            _accept(s)
             and i16(s[14:16]) in [0, 3]  # flags
             and s[20:22] == b"\x00\x00"  # reserved
         ):
             raise SyntaxError("not an FLI/FLC file")
 
         # frames
-        self.__framecount = i16(s[6:8])
+        self.n_frames = i16(s[6:8])
+        self.is_animated = self.n_frames > 1
 
         # image characteristics
         self.mode = "P"
@@ -59,6 +59,7 @@ class FliImageFile(ImageFile.ImageFile):
 
         # animation speed
         duration = i32(s[16:20])
+        magic = i16(s[4:6])
         if magic == 0xAF11:
             duration = (duration * 1000) // 70
         self.info["duration"] = duration
@@ -109,14 +110,6 @@ class FliImageFile(ImageFile.ImageFile):
                 b = i8(s[n + 2]) << shift
                 palette[i] = (r, g, b)
                 i += 1
-
-    @property
-    def n_frames(self):
-        return self.__framecount
-
-    @property
-    def is_animated(self):
-        return self.__framecount > 1
 
     def seek(self, frame):
         if not self._seek_check(frame):
